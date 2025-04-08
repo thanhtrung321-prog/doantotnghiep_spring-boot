@@ -76,7 +76,7 @@ const Navbar = () => {
               <FaUser className="h-6 w-6" />
               {user && (
                 <span className="text-amber-900 font-medium">
-                  {user.fullName} {/* Chỉ hiển thị full_name */}
+                  {user.fullName || user.email} {/* Chỉ hiển thị full_name */}
                 </span>
               )}
             </button>
