@@ -13,8 +13,9 @@ import About from "../pages/about/about";
 import Contact from "../pages/contact/Contact";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
-import { Profiler } from "react";
 import Profileuser from "../pages/profile/Profileuser";
+import Footeradmin from "../pages/admin/Dashboard/footeradmin/footeradmin";
+import HeaderAdmin from "../pages/admin/Dashboard/headeradmin/headeradmin";
 
 const AppRoutes = () => {
   return (
@@ -134,6 +135,15 @@ const AppRoutes = () => {
             <Navbar />
             <Profileuser />
             <Footer />
+          </>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <>
+            <HeaderAdmin />
+            <Footeradmin />
           </>
         }
       />
