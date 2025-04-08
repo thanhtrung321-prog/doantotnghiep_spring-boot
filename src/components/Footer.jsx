@@ -6,7 +6,7 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h5 className="text-xl font-bold mb-4">Mái Tóc Đẹp</h5>
+            <h5 className="text-xl font-bold mb-4">Beauty Salon</h5>
             <p className="mb-4">
               Nơi chăm sóc và tạo kiểu tóc chuyên nghiệp hàng đầu Việt Nam.
               Chúng tôi cam kết mang đến cho bạn trải nghiệm làm đẹp tuyệt vời.
@@ -130,13 +130,13 @@ const Footer = () => {
                     d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                   />
                 </svg>
-                <span>info@maitocdep.vn</span>
+                <span>info@salonbeautysalon.vn</span>
               </li>
             </ul>
           </div>
         </div>
         <div className="border-t border-amber-800 mt-8 pt-8 text-center">
-          <p>© 2025 Mái Tóc Đẹp. Tất cả các quyền được bảo lưu.</p>
+          <p>© 2025 Beauty Salon. Tất cả các quyền được bảo lưu.</p>
         </div>
       </div>
     </footer>
