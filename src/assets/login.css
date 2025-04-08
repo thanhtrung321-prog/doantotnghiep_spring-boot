@@ -1,0 +1,209 @@
+.login-container {
+    min-height: 100vh;
+    background-image: url("../assets/image/anhnensalon.jpg");
+    /* Gradient cam nhạt đến cam đậm */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.login-box {
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 450px;
+    /* Tăng từ 400px lên 450px để rộng hơn */
+}
+
+.login-title {
+    font-size: 2.2rem;
+    /* Tăng nhẹ kích thước chữ cho cân đối */
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.login-subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.input-group {
+    position: relative;
+}
+
+.login-input {
+    width: 100%;
+    padding: 14px;
+    /* Tăng padding từ 12px lên 14px để rộng rãi hơn */
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.login-input:focus {
+    outline: none;
+    border-color: #ff5722;
+    /* Đổi màu viền khi focus sang cam đậm */
+}
+
+.error-message {
+    color: #ff5722;
+    /* Đổi màu lỗi sang cam đậm */
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.login-button {
+    background: #ff5722;
+    /* Đổi màu nút sang cam đậm */
+    color: white;
+    padding: 14px;
+    /* Tăng padding từ 12px lên 14px */
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.login-button:hover {
+    background: #e64a19;
+    /* Màu cam đậm hơn khi hover */
+}
+
+.divider {
+    margin: 20px 0;
+    text-align: center;
+    position: relative;
+}
+
+.divider span {
+    background: white;
+    padding: 0 10px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #ddd;
+    z-index: -1;
+}
+
+.social-login {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.social-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    /* Tăng padding từ 12px lên 14px */
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    color: white;
+}
+
+.google {
+    background: #db4437;
+}
+
+.google:hover {
+    background: #c1352b;
+}
+
+.facebook {
+    background: #3b5998;
+}
+
+.facebook:hover {
+    background: #2d4373;
+}
+
+.social-icon {
+    font-size: 1.2rem;
+}
+
+.signup-link {
+    text-align: center;
+    margin-top: 20px;
+    color: #666;
+}
+
+.signup-link a {
+    color: #ff5722;
+    /* Đổi màu link sang cam đậm */
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.signup-link a:hover {
+    text-decoration: underline;
+}
+
+
+/* model login */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    /* mờ nền */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.modal-box {
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 30px 40px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    max-width: 400px;
+    width: 90%;
+}
+
+.modal-button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #6c5ce7;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.modal-button:hover {
+    background-color: #5a4bd1;
+}

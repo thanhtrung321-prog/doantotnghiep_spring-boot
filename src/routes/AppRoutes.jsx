@@ -5,8 +5,14 @@ import ServiceList from "../pages/Services/ServiceList";
 import Footer from "../components/Footer";
 import Collection from "../pages/collection/Collection";
 import BookingPage from "../pages/Booking/BookingPage";
-import Contact from "../pages/contact/Contact";
 import Header from "../components/Header";
+import ServiceOverring from "../pages/home/ServiceOverring";
+import TablePrice from "../pages/tableprice/TablePrice";
+import SalonInfo from "../pages/Salon/Saloninfo";
+import About from "../pages/about/about";
+import Contact from "../pages/contact/Contact";
+import Login from "../pages/Login";
+import Register from "../pages/Register";
 
 const AppRoutes = () => {
   return (
@@ -19,6 +25,7 @@ const AppRoutes = () => {
             <Header />
             <Navbar />
             <Silider />
+            <ServiceOverring />
             <Footer />
           </>
         }
@@ -59,11 +66,59 @@ const AppRoutes = () => {
       />
       {/* Trang Liên Hệ */}
       <Route
+        path="/about"
+        element={
+          <>
+            <Header />
+            <Navbar />
+            <About />
+            <SalonInfo />
+            <Footer />
+          </>
+        }
+      />
+
+      <Route
+        path="/tableprice"
+        element={
+          <>
+            <Header />
+            <Navbar />
+            <TablePrice />
+            <Footer />
+          </>
+        }
+      />
+      <Route
         path="/contact"
         element={
           <>
+            <Header />
             <Navbar />
             <Contact />
+            <Footer />
+          </>
+        }
+      />
+
+      <Route
+        path="/login"
+        element={
+          <>
+            <Header />
+            <Navbar />
+            <Login />
+            <Footer />
+          </>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <>
+            <Header />
+            <Navbar />
+            <Register />
             <Footer />
           </>
         }

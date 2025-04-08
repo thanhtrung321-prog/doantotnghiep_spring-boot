@@ -1,17 +1,35 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Header from "./Header";
+import { FaUser } from "react-icons/fa";
 
 const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // Khai báo state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [user, setUser] = useState(null); // State để lưu thông tin user
+
+  // Lấy user từ localStorage khi component mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    setUser(null);
+    window.location.href = "/login"; // Chuyển hướng về trang login
+  };
 
   return (
     <nav className="bg-white shadow-md fixed w-full z-50 top-0">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-        {/* Navbar sẽ gọi component Header */}
         <Header />
 
-        <div className="hidden md:flex space-x-6">
+        {/* Menu desktop */}
+        <div className="hidden md:flex space-x-6 items-center">
           <Link
             to="/"
             className="text-amber-900 hover:text-amber-600 font-medium"
@@ -30,29 +48,134 @@ const Navbar = () => {
           >
             Mẫu Tóc
           </Link>
-          <a
-            href="#"
+          <Link
+            to="/tableprice"
             className="text-amber-900 hover:text-amber-600 font-medium"
           >
             Bảng Giá
-          </a>
+          </Link>
           <Link
-            to="/contact"
+            to="/about"
             className="text-amber-900 hover:text-amber-600 font-medium"
           >
             Về Chúng Tôi
           </Link>
-          <a
-            href="#"
+          <Link
+            to="/contact"
             className="text-amber-900 hover:text-amber-600 font-medium"
           >
             Liên Hệ
-          </a>
+          </Link>
+
+          {/* User icon + full_name + menu */}
+          <div className="relative flex items-center space-x-2">
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="text-amber-900 hover:text-amber-600 focus:outline-none flex items-center space-x-2"
+            >
+              <FaUser className="h-6 w-6" />
+              {user && (
+                <span className="text-amber-900 font-medium">
+                  {user.fullName} {/* Chỉ hiển thị full_name */}
+                </span>
+              )}
+            </button>
+            {isUserMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg py-2 z-50">
+                {!user ? (
+                  <>
+                    <Link
+                      to="/login"
+                      className="block px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Đăng Nhập
+                    </Link>
+                    <Link
+                      to="/register"
+                      className="block px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Đăng Ký
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Trang Cá Nhân
+                    </Link>
+                    <button
+                      className="block w-full text-left px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={handleLogout}
+                    >
+                      Đăng Xuất
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="md:hidden">
+        {/* Mobile menu toggle */}
+        <div className="md:hidden flex items-center space-x-4">
+          <div className="relative flex items-center space-x-2">
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="text-amber-900 hover:text-amber-600 focus:outline-none flex items-center space-x-2"
+            >
+              <FaUser className="h-6 w-6" />
+              {user && (
+                <span className="text-amber-900 font-medium">
+                  {user.full_name} {/* Chỉ hiển thị full_name */}
+                </span>
+              )}
+            </button>
+            {isUserMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg py-2 z-50">
+                {!user ? (
+                  <>
+                    <Link
+                      to="/login"
+                      className="block px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Đăng Nhập
+                    </Link>
+                    <Link
+                      to="/register"
+                      className="block px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Đăng Ký
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Trang Cá Nhân
+                    </Link>
+                    <button
+                      className="block w-full text-left px-4 py-2 text-amber-900 hover:bg-amber-100 hover:text-amber-600"
+                      onClick={handleLogout}
+                    >
+                      Đăng Xuất
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)} // Điều khiển mở/đóng menu
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="text-amber-900 focus:outline-none"
           >
             <svg
@@ -73,46 +196,52 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-white px-4 py-2">
           <div className="flex flex-col space-y-2">
-            <a
-              href="#"
+            <Link
+              to="/"
               className="text-amber-900 hover:text-amber-600 font-medium py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               Trang Chủ
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="/services"
               className="text-amber-900 hover:text-amber-600 font-medium py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               Dịch Vụ
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="/collection"
               className="text-amber-900 hover:text-amber-600 font-medium py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               Mẫu Tóc
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="/tableprice"
               className="text-amber-900 hover:text-amber-600 font-medium py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               Bảng Giá
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="/about"
               className="text-amber-900 hover:text-amber-600 font-medium py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               Về Chúng Tôi
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="/contact"
               className="text-amber-900 hover:text-amber-600 font-medium py-2"
+              onClick={() => setIsMenuOpen(false)}
             >
               Liên Hệ
-            </a>
+            </Link>
           </div>
         </div>
       )}
