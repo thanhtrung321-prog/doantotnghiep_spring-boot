@@ -16,6 +16,7 @@ import Register from "../pages/Register";
 import Profileuser from "../pages/profile/Profileuser";
 import Footeradmin from "../pages/admin/Dashboard/footeradmin/footeradmin";
 import HeaderAdmin from "../pages/admin/Dashboard/headeradmin/headeradmin";
+import Dashboard from "../pages/admin/Dashboard/homeadmin/Dashboard";
 
 const AppRoutes = () => {
   return (
@@ -143,6 +144,7 @@ const AppRoutes = () => {
         element={
           <>
             <HeaderAdmin />
+            <Dashboard />
             <Footeradmin />
           </>
         }
