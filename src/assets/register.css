@@ -159,3 +159,58 @@
 .login-link a:hover {
     text-decoration: underline;
 }
+
+/* CSS cho Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.modal-title {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #ff5722;
+    /* Màu cam đậm */
+    margin-bottom: 15px;
+}
+
+.modal-message {
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.modal-button {
+    background: #ff5722;
+    /* Màu cam đậm */
+    color: white;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.modal-button:hover {
+    background: #e64a19;
+    /* Cam đậm hơn khi hover */
+}

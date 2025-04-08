@@ -1,51 +1,85 @@
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "../assets/register.css"; // File CSS riêng cho Register
 import { FaGoogle, FaFacebook } from "react-icons/fa"; // Icon cho Google và Facebook
 import { motion } from "framer-motion"; // Animation library
+import registerUser from "../utils/registerUser"; // Import registerUser từ utils
 
 const Register = () => {
-  // State để quản lý form input
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false); // State để hiển thị modal
 
   // Xử lý submit form
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!name || !email || !password || !confirmPassword) {
       setError("Vui lòng điền đầy đủ thông tin!");
       return;
     }
+
     if (password !== confirmPassword) {
       setError("Mật khẩu xác nhận không khớp!");
       return;
     }
-    // Logic xử lý đăng ký ở đây
-    console.log("Đăng ký với:", { name, email, password });
-    setError("");
+
+    try {
+      const userData = {
+        full_name: name,
+        email,
+        password,
+        phone: "",
+        username: email.split("@")[0],
+        role: "USER",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      await registerUser(userData);
+      setShowSuccessModal(true); // Hiển thị modal khi đăng ký thành công
+    } catch (err) {
+      setError(err.message || "Đăng ký thất bại. Vui lòng thử lại!");
+    }
+  };
+
+  // Xử lý đóng modal và chuyển hướng
+  const handleCloseModal = () => {
+    setShowSuccessModal(false);
+    navigate("/login");
   };
 
   // Xử lý đăng ký Google
   const handleGoogleRegister = () => {
-    // Logic đăng ký Google (có thể dùng Firebase hoặc OAuth)
     console.log("Đăng ký bằng Google");
   };
 
   // Xử lý đăng ký Facebook
   const handleFacebookRegister = () => {
-    // Logic đăng ký Facebook (có thể dùng Firebase hoặc OAuth)
     console.log("Đăng ký bằng Facebook");
   };
 
-  // Animation variants
+  // Animation variants cho form
   const containerVariants = {
     hidden: { opacity: 0, y: 50 },
     visible: {
       opacity: 1,
       y: 0,
       transition: { duration: 0.5, ease: "easeOut" },
+    },
+  };
+
+  // Animation variants cho modal
+  const modalVariants = {
+    hidden: { opacity: 0, scale: 0.8 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.3, ease: "easeOut" },
     },
   };
 
@@ -57,7 +91,7 @@ const Register = () => {
         initial="hidden"
         animate="visible"
       >
-        <h1 className="register-title">Đăng Ký Salon </h1>
+        <h1 className="register-title">Đăng Ký Salon</h1>
         <p className="register-subtitle">
           Tham gia ngay để trải nghiệm dịch vụ đỉnh cao!
         </p>
@@ -138,9 +172,34 @@ const Register = () => {
 
         {/* Link đăng nhập */}
         <p className="login-link">
-          Đã có tài khoản? <a href="/login">Đăng nhập ngay</a>
+          Đã có tài khoản? <Link to="/login">Đăng nhập ngay</Link>
         </p>
       </motion.div>
+
+      {/* Modal thông báo thành công */}
+      {showSuccessModal && (
+        <div className="modal-overlay">
+          <motion.div
+            className="modal-content"
+            variants={modalVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <h2 className="modal-title">Đăng Ký Thành Công!</h2>
+            <p className="modal-message">
+              Tài khoản của bạn đã được tạo. Hãy đăng nhập để tiếp tục.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleCloseModal}
+              className="modal-button"
+            >
+              Đi đến Đăng Nhập
+            </motion.button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
