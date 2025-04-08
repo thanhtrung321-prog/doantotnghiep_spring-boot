@@ -13,6 +13,8 @@ import About from "../pages/about/about";
 import Contact from "../pages/contact/Contact";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
+import { Profiler } from "react";
+import Profileuser from "../pages/profile/Profileuser";
 
 const AppRoutes = () => {
   return (
@@ -119,6 +121,18 @@ const AppRoutes = () => {
             <Header />
             <Navbar />
             <Register />
+            <Footer />
+          </>
+        }
+      />
+
+      <Route
+        path="/profile"
+        element={
+          <>
+            <Header />
+            <Navbar />
+            <Profileuser />
             <Footer />
           </>
         }
