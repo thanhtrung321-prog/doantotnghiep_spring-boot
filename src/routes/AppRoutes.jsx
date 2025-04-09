@@ -18,6 +18,9 @@ import Footeradmin from "../pages/admin/Dashboard/footeradmin/footeradmin";
 import HeaderAdmin from "../pages/admin/Dashboard/headeradmin/headeradmin";
 import Dashboard from "../pages/admin/Dashboard/homeadmin/Dashboard";
 import Bookings from "../pages/admin/Dashboard/homeadmin/Bookings";
+import Categories from "../pages/admin/Dashboard/homeadmin/Categories";
+import Payments from "../pages/admin/Dashboard/homeadmin/Payments";
+import Salons from "../pages/admin/Dashboard/homeadmin/Salons";
 
 const AppRoutes = () => {
   return (
@@ -156,6 +159,36 @@ const AppRoutes = () => {
           <>
             <HeaderAdmin />
             <Bookings />
+            <Footeradmin />
+          </>
+        }
+      />
+      <Route
+        path="/admin/category"
+        element={
+          <>
+            <HeaderAdmin />
+            <Categories />
+            <Footeradmin />
+          </>
+        }
+      />
+      <Route
+        path="/admin/payment"
+        element={
+          <>
+            <HeaderAdmin />
+            <Payments />
+            <Footeradmin />
+          </>
+        }
+      />
+      <Route
+        path="/admin/salon"
+        element={
+          <>
+            <HeaderAdmin />
+            <Salons />
             <Footeradmin />
           </>
         }
