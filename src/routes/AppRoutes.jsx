@@ -17,6 +17,7 @@ import Profileuser from "../pages/profile/Profileuser";
 import Footeradmin from "../pages/admin/Dashboard/footeradmin/footeradmin";
 import HeaderAdmin from "../pages/admin/Dashboard/headeradmin/headeradmin";
 import Dashboard from "../pages/admin/Dashboard/homeadmin/Dashboard";
+import Bookings from "../pages/admin/Dashboard/homeadmin/Bookings";
 
 const AppRoutes = () => {
   return (
@@ -145,6 +146,16 @@ const AppRoutes = () => {
           <>
             <HeaderAdmin />
             <Dashboard />
+            <Footeradmin />
+          </>
+        }
+      />
+      <Route
+        path="/admin/booking"
+        element={
+          <>
+            <HeaderAdmin />
+            <Bookings />
             <Footeradmin />
           </>
         }

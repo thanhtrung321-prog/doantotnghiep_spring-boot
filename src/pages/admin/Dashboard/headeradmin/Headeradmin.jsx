@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom"; // Import Link từ react-router-dom
 
 const HeaderAdmin = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -103,8 +104,8 @@ const HeaderAdmin = () => {
 
             {/* Desktop Navigation */}
             <nav className="hidden lg:ml-8 lg:flex lg:space-x-1">
-              <a
-                href="#"
+              <Link
+                to="/admin"
                 onClick={() => setActiveService("dashboard")}
                 className={`${
                   activeService === "dashboard"
@@ -127,12 +128,12 @@ const HeaderAdmin = () => {
                   />
                 </svg>
                 Dashboard
-              </a>
+              </Link>
 
               {services.map((service) => (
-                <a
+                <Link
                   key={service.id}
-                  href={`#${service.id}`}
+                  to={`/admin/${service.id}`}
                   onClick={() => setActiveService(service.id)}
                   className={`${
                     activeService === service.id
@@ -160,7 +161,7 @@ const HeaderAdmin = () => {
                     )}
                   </div>
                   {service.name.split(" ")[0]}
-                </a>
+                </Link>
               ))}
             </nav>
           </div>
@@ -317,8 +318,8 @@ const HeaderAdmin = () => {
                     </div>
                   </div>
                   <div className="py-2 px-4 border-t border-gray-200 bg-gray-50 rounded-b-md">
-                    <a
-                      href="#"
+                    <Link
+                      to="/admin/notifications"
                       className="text-xs font-medium text-indigo-600 hover:text-indigo-500 flex items-center"
                     >
                       <span>View all notifications</span>
@@ -336,7 +337,7 @@ const HeaderAdmin = () => {
                           d="M9 5l7 7-7 7"
                         />
                       </svg>
-                    </a>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -375,8 +376,8 @@ const HeaderAdmin = () => {
                     <p className="text-xs text-gray-500">admin@glamsalon.com</p>
                   </div>
                   <div className="py-1" role="menu" aria-orientation="vertical">
-                    <a
-                      href="#"
+                    <Link
+                      to="/admin/profile"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                       role="menuitem"
                     >
@@ -395,9 +396,9 @@ const HeaderAdmin = () => {
                         />
                       </svg>
                       Your Profile
-                    </a>
-                    <a
-                      href="#"
+                    </Link>
+                    <Link
+                      to="/admin/settings"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                       role="menuitem"
                     >
@@ -422,9 +423,9 @@ const HeaderAdmin = () => {
                         />
                       </svg>
                       Settings
-                    </a>
-                    <a
-                      href="#"
+                    </Link>
+                    <Link
+                      to="/logout"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center text-red-600 hover:text-red-700"
                       role="menuitem"
                     >
@@ -443,7 +444,7 @@ const HeaderAdmin = () => {
                         />
                       </svg>
                       Sign out
-                    </a>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -455,8 +456,8 @@ const HeaderAdmin = () => {
       {/* Mobile menu */}
       <div className={`lg:hidden ${isMobileMenuOpen ? "block" : "hidden"}`}>
         <div className="pt-2 pb-3 space-y-1 bg-indigo-900 border-t border-indigo-800">
-          <a
-            href="#"
+          <Link
+            to="/admin/dashboard"
             onClick={() => setActiveService("dashboard")}
             className={`${
               activeService === "dashboard"
@@ -481,12 +482,12 @@ const HeaderAdmin = () => {
               </svg>
               Dashboard
             </div>
-          </a>
+          </Link>
 
           {services.map((service) => (
-            <a
+            <Link
               key={service.id}
-              href={`#${service.id}`}
+              to={`/admin/${service.id}`}
               onClick={() => setActiveService(service.id)}
               className={`${
                 activeService === service.id
@@ -516,7 +517,7 @@ const HeaderAdmin = () => {
                 </div>
                 {service.name}
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       </div>
