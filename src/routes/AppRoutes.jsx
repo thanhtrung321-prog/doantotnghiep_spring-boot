@@ -21,6 +21,7 @@ import Bookings from "../pages/admin/Dashboard/homeadmin/Bookings";
 import Categories from "../pages/admin/Dashboard/homeadmin/Categories";
 import Payments from "../pages/admin/Dashboard/homeadmin/Payments";
 import Salons from "../pages/admin/Dashboard/homeadmin/Salons";
+import Services from "../pages/admin/Dashboard/homeadmin/Services";
 
 const AppRoutes = () => {
   return (
@@ -189,6 +190,16 @@ const AppRoutes = () => {
           <>
             <HeaderAdmin />
             <Salons />
+            <Footeradmin />
+          </>
+        }
+      />
+      <Route
+        path="/admin/service-offering"
+        element={
+          <>
+            <HeaderAdmin />
+            <Services />
             <Footeradmin />
           </>
         }
