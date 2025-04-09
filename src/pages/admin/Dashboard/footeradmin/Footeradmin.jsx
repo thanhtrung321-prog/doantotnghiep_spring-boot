@@ -1,76 +1,62 @@
-import React from "react";
-import {
-  Mail,
-  Phone,
-  Instagram,
-  Facebook,
-  Twitter,
-  MapPin,
-  Clock,
-} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Mail, Phone } from "lucide-react";
 
 const FooterAdmin = () => {
+  const [currentTime, setCurrentTime] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+
+      const day = now.getDate().toString().padStart(2, "0");
+      const month = (now.getMonth() + 1).toString().padStart(2, "0"); // tháng bắt đầu từ 0
+      const year = now.getFullYear();
+
+      const hours = now.getHours().toString().padStart(2, "0");
+      const minutes = now.getMinutes().toString().padStart(2, "0");
+      const seconds = now.getSeconds().toString().padStart(2, "0");
+
+      const formattedTime = `${day}/${month}/${year} - ${hours}:${minutes}:${seconds}`;
+      setCurrentTime(formattedTime);
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <footer className="bg-orange-100 border-t-4 border-orange-500 px-6 py-4 mt-auto">
-      <div className="container mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center">
-          <div className="mb-4 md:mb-0">
-            <h3 className="text-orange-600 font-bold text-lg">
-              Beauty Hair Salon
+    <footer className="bg-indigo-900 text-indigo-100 px-6 py-4 mt-auto border-t border-indigo-500">
+      <div className="container mx-auto max-w-7xl">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          {/* Thông tin hệ thống */}
+          <div className="text-sm">
+            <h3 className="font-semibold text-orange-300 text-lg">
+              Beauty Salon - Admin Dashboard
             </h3>
-            <p className="text-gray-700 text-sm mt-1">Hệ thống quản lý salon</p>
+            <p className="text-indigo-200">Hệ thống quản trị salon</p>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-            <div className="flex items-center text-orange-700">
-              <Phone size={16} className="mr-2" />
-              <span className="text-sm">0987 654 321</span>
+          {/* Thông tin liên hệ */}
+          <div className="flex flex-col md:flex-row items-center gap-4 text-sm">
+            <div className="flex items-center gap-1">
+              <Phone size={16} className="text-orange-300" />
+              <span>0987 654 321</span>
             </div>
-
-            <div className="flex items-center text-orange-700">
-              <Mail size={16} className="mr-2" />
-              <span className="text-sm">contact@beautysalon.com</span>
-            </div>
-
-            <div className="flex gap-3">
-              <a
-                href="#"
-                className="text-orange-500 hover:text-orange-700 transition-colors"
-              >
-                <Facebook size={18} />
-              </a>
-              <a
-                href="#"
-                className="text-orange-500 hover:text-orange-700 transition-colors"
-              >
-                <Instagram size={18} />
-              </a>
-              <a
-                href="#"
-                className="text-orange-500 hover:text-orange-700 transition-colors"
-              >
-                <Twitter size={18} />
-              </a>
+            <div className="flex items-center gap-1">
+              <Mail size={16} className="text-orange-300" />
+              <span>admin@beautysalon.com</span>
             </div>
           </div>
         </div>
 
-        <div className="border-t border-orange-200 mt-4 pt-4 flex flex-col md:flex-row justify-between items-center">
-          <div className="text-xs text-gray-600">
-            © 2025 Beauty Salon. Đã đăng ký bản quyền.
-          </div>
-          <div className="mt-2 md:mt-0 flex gap-4">
-            <a href="#" className="text-xs text-gray-600 hover:text-orange-600">
-              Điều khoản
-            </a>
-            <a href="#" className="text-xs text-gray-600 hover:text-orange-600">
-              Chính sách
-            </a>
-            <a href="#" className="text-xs text-gray-600 hover:text-orange-600">
-              Hỗ trợ
-            </a>
-          </div>
+        {/* Ngày giờ hiện tại */}
+        <div className="mt-4 text-center text-sm text-orange-200 font-medium">
+          Thời gian hiện tại: {currentTime}
         </div>
+
+        <div className="mt-2 border-t border-indigo-400 pt-3 text-xs text-center text-indigo-200"></div>
       </div>
     </footer>
   );

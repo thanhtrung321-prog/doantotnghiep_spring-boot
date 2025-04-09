@@ -22,6 +22,7 @@ import Categories from "../pages/admin/Dashboard/homeadmin/Categories";
 import Payments from "../pages/admin/Dashboard/homeadmin/Payments";
 import Salons from "../pages/admin/Dashboard/homeadmin/Salons";
 import Services from "../pages/admin/Dashboard/homeadmin/Services";
+import Users from "../pages/admin/Dashboard/homeadmin/Users";
 
 const AppRoutes = () => {
   return (
@@ -200,6 +201,16 @@ const AppRoutes = () => {
           <>
             <HeaderAdmin />
             <Services />
+            <Footeradmin />
+          </>
+        }
+      />
+      <Route
+        path="/admin/user"
+        element={
+          <>
+            <HeaderAdmin />
+            <Users />
             <Footeradmin />
           </>
         }
