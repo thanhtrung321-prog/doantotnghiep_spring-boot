@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
+import {
+  getAllUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+} from "../../api/apiadmin/usermannager";
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -10,110 +16,46 @@ const Users = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState({
-    key: "created_at",
+    key: "createdAt",
     direction: "desc",
+  });
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false); // Modal thêm người dùng
+  const [newUserData, setNewUserData] = useState({
+    fullName: "",
+    username: "",
+    email: "",
+    phone: "",
+    role: "USER",
+    password: "",
   });
 
   const threeCanvasRef = useRef(null);
 
-  // Mock data - replace with your actual API call
+  // Lấy danh sách người dùng từ API
   useEffect(() => {
-    setTimeout(() => {
-      const mockUsers = [
-        {
-          id: 1,
-          username: "john_doe",
-          full_name: "John Doe",
-          email: "john@example.com",
-          phone: "123-456-7890",
-          role: "admin",
-          created_at: "2024-12-01T10:00:00",
-          updated_at: "2025-01-15T08:30:00",
-        },
-        {
-          id: 2,
-          username: "jane_smith",
-          full_name: "Jane Smith",
-          email: "jane@example.com",
-          phone: "234-567-8901",
-          role: "staff",
-          created_at: "2025-01-05T14:20:00",
-          updated_at: "2025-02-10T11:45:00",
-        },
-        {
-          id: 3,
-          username: "bob_johnson",
-          full_name: "Bob Johnson",
-          email: "bob@example.com",
-          phone: "345-678-9012",
-          role: "user",
-          created_at: "2025-02-12T09:15:00",
-          updated_at: "2025-03-01T16:20:00",
-        },
-        {
-          id: 4,
-          username: "sarah_lee",
-          full_name: "Sarah Lee",
-          email: "sarah@example.com",
-          phone: "456-789-0123",
-          role: "staff",
-          created_at: "2025-01-20T11:30:00",
-          updated_at: "2025-02-28T13:10:00",
-        },
-        {
-          id: 5,
-          username: "mike_brown",
-          full_name: "Mike Brown",
-          email: "mike@example.com",
-          phone: "567-890-1234",
-          role: "user",
-          created_at: "2025-02-15T16:45:00",
-          updated_at: "2025-03-05T10:30:00",
-        },
-        {
-          id: 6,
-          username: "emily_davis",
-          full_name: "Emily Davis",
-          email: "emily@example.com",
-          phone: "678-901-2345",
-          role: "staff",
-          created_at: "2025-01-10T08:20:00",
-          updated_at: "2025-02-20T15:40:00",
-        },
-        {
-          id: 7,
-          username: "alex_wilson",
-          full_name: "Alex Wilson",
-          email: "alex@example.com",
-          phone: "789-012-3456",
-          role: "admin",
-          created_at: "2024-12-15T13:50:00",
-          updated_at: "2025-01-25T09:15:00",
-        },
-        {
-          id: 8,
-          username: "lisa_taylor",
-          full_name: "Lisa Taylor",
-          email: "lisa@example.com",
-          phone: "890-123-4567",
-          role: "user",
-          created_at: "2025-02-01T10:10:00",
-          updated_at: "2025-03-10T14:25:00",
-        },
-      ];
-
-      setUsers(mockUsers);
-      setFilteredUsers(mockUsers);
-      setIsLoading(false);
-    }, 1000);
+    const fetchUsers = async () => {
+      try {
+        setIsLoading(true);
+        const data = await getAllUsers();
+        setUsers(data);
+        setFilteredUsers(data);
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUsers();
   }, []);
 
-  // Filter users based on search and role
+  // Filter và sort người dùng
   useEffect(() => {
     let result = [...users];
 
     if (selectedRole !== "all") {
-      result = result.filter((user) => user.role === selectedRole);
+      result = result.filter(
+        (user) => user.role.toLowerCase() === selectedRole
+      );
     }
 
     if (searchTerm) {
@@ -121,7 +63,7 @@ const Users = () => {
       result = result.filter(
         (user) =>
           user.username.toLowerCase().includes(lowercasedSearch) ||
-          user.full_name.toLowerCase().includes(lowercasedSearch) ||
+          user.fullName.toLowerCase().includes(lowercasedSearch) ||
           user.email.toLowerCase().includes(lowercasedSearch) ||
           user.phone.includes(searchTerm)
       );
@@ -129,10 +71,12 @@ const Users = () => {
 
     if (sortConfig.key) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+        if (aValue < bValue) {
           return sortConfig.direction === "asc" ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aValue > bValue) {
           return sortConfig.direction === "asc" ? 1 : -1;
         }
         return 0;
@@ -142,7 +86,7 @@ const Users = () => {
     setFilteredUsers(result);
   }, [users, searchTerm, selectedRole, sortConfig]);
 
-  // Initialize Three.js animation
+  // Three.js animation (giữ nguyên hiệu ứng hạt)
   useEffect(() => {
     if (!threeCanvasRef.current) return;
 
@@ -200,7 +144,10 @@ const Users = () => {
       opacity: 0.8,
     });
 
-    const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+    const particlesMesh = new THREE.Points(
+      particlesGeometry,
+      particlesMaterial
+    );
     scene.add(particlesMesh);
 
     camera.position.z = 5;
@@ -277,7 +224,7 @@ const Users = () => {
 
   // Role badge color
   const getRoleBadgeColor = (role) => {
-    switch (role) {
+    switch (role.toLowerCase()) {
       case "admin":
         return "bg-red-500";
       case "staff":
@@ -287,19 +234,64 @@ const Users = () => {
     }
   };
 
+  // Handle add user
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    try {
+      const createdUser = await createUser(newUserData);
+      setUsers((prev) => [...prev, createdUser]);
+      setIsAddModalOpen(false);
+      setNewUserData({
+        fullName: "",
+        username: "",
+        email: "",
+        phone: "",
+        role: "USER",
+        password: "",
+      });
+    } catch (error) {
+      console.error("Failed to add user:", error);
+      alert("Failed to add user. Please try again.");
+    }
+  };
+
+  // Handle update user
+  const handleUpdateUser = async () => {
+    try {
+      const updatedUser = await updateUser(selectedUser.id, selectedUser);
+      setUsers((prev) =>
+        prev.map((user) => (user.id === updatedUser.id ? updatedUser : user))
+      );
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Failed to update user:", error);
+      alert("Failed to update user. Please try again.");
+    }
+  };
+
+  // Handle delete user
+  const handleDeleteUser = async (id) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
+      try {
+        await deleteUser(id);
+        setUsers((prev) => prev.filter((user) => user.id !== id));
+      } catch (error) {
+        console.error("Failed to delete user:", error);
+        alert("Failed to delete user. Please try again.");
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Main Content Container */}
       <div className="relative z-10 container mx-auto px-4 py-6">
         {/* Page Title */}
         <div className="relative">
-          {/* Three.js Canvas Background */}
           <canvas
             ref={threeCanvasRef}
             className="absolute top-0 left-0 w-full h-full opacity-50 pointer-events-none z-0"
           />
-
-          {/* Nội dung hiển thị trên nền */}
           <div className="relative z-10 mb-8 text-center">
             <h2 className="text-3xl font-bold mb-2 text-orange-500">
               <span className="text-amber-50">Quản Lý</span> Người dùng
@@ -342,11 +334,14 @@ const Users = () => {
               <option value="all">Tất cả quyền</option>
               <option value="admin">Quản Trị Viên</option>
               <option value="staff">Nhân viên</option>
-              <option value="user">Người Dùng </option>
+              <option value="user">Người Dùng</option>
             </select>
           </div>
 
-          <button className="w-full md:w-auto px-6 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all flex items-center justify-center gap-2 cursor-pointer">
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="w-full md:w-auto px-6 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
             <svg
               className="w-5 h-5"
               fill="none"
@@ -371,7 +366,7 @@ const Users = () => {
               <div>
                 <p className="text-gray-400 text-sm">Total Users</p>
                 <p className="text-2xl font-bold">
-                  {users.filter((u) => u.role === "user").length}
+                  {users.filter((u) => u.role.toLowerCase() === "user").length}
                 </p>
               </div>
               <div className="bg-blue-500/20 p-3 rounded-full">
@@ -397,7 +392,7 @@ const Users = () => {
               <div>
                 <p className="text-gray-400 text-sm">Staff Members</p>
                 <p className="text-2xl font-bold">
-                  {users.filter((u) => u.role === "staff").length}
+                  {users.filter((u) => u.role.toLowerCase() === "staff").length}
                 </p>
               </div>
               <div className="bg-orange-500/20 p-3 rounded-full">
@@ -423,7 +418,7 @@ const Users = () => {
               <div>
                 <p className="text-gray-400 text-sm">Administrators</p>
                 <p className="text-2xl font-bold">
-                  {users.filter((u) => u.role === "admin").length}
+                  {users.filter((u) => u.role.toLowerCase() === "admin").length}
                 </p>
               </div>
               <div className="bg-red-500/20 p-3 rounded-full">
@@ -470,9 +465,9 @@ const Users = () => {
                     </th>
                     <th
                       className="px-4 py-3 cursor-pointer hover:bg-gray-700"
-                      onClick={() => requestSort("full_name")}
+                      onClick={() => requestSort("fullName")}
                     >
-                      Full Name {getSortDirectionIndicator("full_name")}
+                      Full Name {getSortDirectionIndicator("fullName")}
                     </th>
                     <th
                       className="px-4 py-3 cursor-pointer hover:bg-gray-700"
@@ -494,9 +489,9 @@ const Users = () => {
                     </th>
                     <th
                       className="px-4 py-3 cursor-pointer hover:bg-gray-700"
-                      onClick={() => requestSort("created_at")}
+                      onClick={() => requestSort("createdAt")}
                     >
-                      Created {getSortDirectionIndicator("created_at")}
+                      Created {getSortDirectionIndicator("createdAt")}
                     </th>
                     <th className="px-4 py-3 text-center">Actions</th>
                   </tr>
@@ -522,7 +517,7 @@ const Users = () => {
                         <td className="px-4 py-3">{user.id}</td>
                         <td className="px-4 py-3">{user.username}</td>
                         <td className="px-4 py-3 font-medium">
-                          {user.full_name}
+                          {user.fullName}
                         </td>
                         <td className="px-4 py-3 text-gray-300">
                           {user.email}
@@ -538,11 +533,10 @@ const Users = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-400">
-                          {formatDate(user.created_at)}
+                          {formatDate(user.createdAt)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex justify-center space-x-2">
-                            {/* Icon View Details (Eye from Heroicons) */}
                             <button
                               onClick={() => handleUserSelect(user)}
                               className="p-1.5 bg-blue-500 bg-opacity-20 rounded hover:bg-opacity-30 transition-all"
@@ -568,8 +562,8 @@ const Users = () => {
                                 />
                               </svg>
                             </button>
-                            {/* Icon Edit User (Pencil from Heroicons) */}
                             <button
+                              onClick={() => handleUserSelect(user)}
                               className="p-1.5 bg-orange-500 bg-opacity-20 rounded hover:bg-opacity-30 transition-all"
                               title="Edit User"
                             >
@@ -588,8 +582,8 @@ const Users = () => {
                                 />
                               </svg>
                             </button>
-                            {/* Icon Delete User (Trash from Heroicons) */}
                             <button
+                              onClick={() => handleDeleteUser(user.id)}
                               className="p-1.5 bg-red-500 bg-opacity-20 rounded hover:bg-opacity-30 transition-all"
                               title="Delete User"
                             >
@@ -619,7 +613,7 @@ const Users = () => {
           )}
         </div>
 
-        {/* Pagination */}
+        {/* Pagination (Giữ nguyên, chưa tích hợp phân trang từ API) */}
         <div className="flex justify-between items-center mt-6">
           <div className="text-sm text-gray-400">
             Showing{" "}
@@ -629,7 +623,6 @@ const Users = () => {
             of <span className="font-medium text-white">{users.length}</span>{" "}
             users
           </div>
-
           <div className="flex space-x-1">
             <button className="px-3 py-1 bg-gray-800 rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
               Previous
@@ -648,7 +641,118 @@ const Users = () => {
         </div>
       </div>
 
-      {/* User Details Modal */}
+      {/* Add User Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-fade-in">
+            <div className="flex justify-between items-center border-b border-gray-800 p-4">
+              <h3 className="text-xl font-bold">Add New User</h3>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1 hover:bg-gray-800 rounded-full transition-all"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <form onSubmit={handleAddUser} className="p-6 space-y-4">
+              <div>
+                <label className="text-sm text-gray-400">Full Name</label>
+                <input
+                  type="text"
+                  value={newUserData.fullName}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, fullName: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Username</label>
+                <input
+                  type="text"
+                  value={newUserData.username}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, username: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Email</label>
+                <input
+                  type="email"
+                  value={newUserData.email}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, email: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Phone</label>
+                <input
+                  type="text"
+                  value={newUserData.phone}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, phone: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Role</label>
+                <select
+                  value={newUserData.role}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, role: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="USER">Người Dùng</option>
+                  <option value="STAFF">Nhân viên</option>
+                  <option value="ADMIN">Quản Trị Viên</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Password</label>
+                <input
+                  type="password"
+                  value={newUserData.password}
+                  onChange={(e) =>
+                    setNewUserData({ ...newUserData, password: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all"
+              >
+                Add User
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Details/Edit Modal */}
       {isModalOpen && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-fade-in">
@@ -673,30 +777,55 @@ const Users = () => {
                 </svg>
               </button>
             </div>
-
             <div className="p-6">
               <div className="flex flex-col items-center mb-6">
                 <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center text-3xl font-bold mb-3">
-                  {selectedUser.full_name
+                  {selectedUser.fullName
                     .split(" ")
                     .map((name) => name[0])
                     .join("")}
                 </div>
-                <h3 className="text-xl font-bold">{selectedUser.full_name}</h3>
-                <span
+                <input
+                  type="text"
+                  value={selectedUser.fullName}
+                  onChange={(e) =>
+                    setSelectedUser({
+                      ...selectedUser,
+                      fullName: e.target.value,
+                    })
+                  }
+                  className="text-xl font-bold bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-center"
+                />
+                <select
+                  value={selectedUser.role}
+                  onChange={(e) =>
+                    setSelectedUser({ ...selectedUser, role: e.target.value })
+                  }
                   className={`mt-1 px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(
                     selectedUser.role
-                  )}`}
+                  )} bg-gray-800 border border-gray-700`}
                 >
-                  {selectedUser.role}
-                </span>
+                  <option value="USER">USER</option>
+                  <option value="STAFF">STAFF</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
               </div>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-400">Username</p>
-                    <p className="font-medium">{selectedUser.username}</p>
+                    <input
+                      type="text"
+                      value={selectedUser.username}
+                      onChange={(e) =>
+                        setSelectedUser({
+                          ...selectedUser,
+                          username: e.target.value,
+                        })
+                      }
+                      className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
+                    />
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">User ID</p>
@@ -706,36 +835,62 @@ const Users = () => {
 
                 <div>
                   <p className="text-sm text-gray-400">Email Address</p>
-                  <p className="font-medium">{selectedUser.email}</p>
+                  <input
+                    type="email"
+                    value={selectedUser.email}
+                    onChange={(e) =>
+                      setSelectedUser({
+                        ...selectedUser,
+                        email: e.target.value,
+                      })
+                    }
+                    className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
+                  />
                 </div>
 
                 <div>
                   <p className="text-sm text-gray-400">Phone Number</p>
-                  <p className="font-medium">{selectedUser.phone}</p>
+                  <input
+                    type="text"
+                    value={selectedUser.phone}
+                    onChange={(e) =>
+                      setSelectedUser({
+                        ...selectedUser,
+                        phone: e.target.value,
+                      })
+                    }
+                    className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-400">Created At</p>
                     <p className="font-medium">
-                      {formatDate(selectedUser.created_at)}
+                      {formatDate(selectedUser.createdAt)}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Last Updated</p>
                     <p className="font-medium">
-                      {formatDate(selectedUser.updated_at)}
+                      {formatDate(selectedUser.updatedAt)}
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-8 flex space-x-3">
-                <button className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all">
-                  Edit User
+                <button
+                  onClick={handleUpdateUser}
+                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all"
+                >
+                  Save Changes
                 </button>
-                <button className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg font-medium transition-all">
-                  Reset Password
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg font-medium transition-all"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
