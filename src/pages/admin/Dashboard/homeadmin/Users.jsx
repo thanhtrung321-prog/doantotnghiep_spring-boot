@@ -19,7 +19,7 @@ const Users = () => {
     key: "createdAt",
     direction: "desc",
   });
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false); // Modal thêm người dùng
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     fullName: "",
     username: "",
@@ -28,6 +28,14 @@ const Users = () => {
     role: "USER",
     password: "",
   });
+
+  // State cho các modal thông báo
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] =
+    useState(false);
+  const [modalMessage, setModalMessage] = useState("");
+  const [userIdToDelete, setUserIdToDelete] = useState(null);
 
   const threeCanvasRef = useRef(null);
 
@@ -41,6 +49,8 @@ const Users = () => {
         setFilteredUsers(data);
       } catch (error) {
         console.error("Failed to fetch users:", error);
+        setModalMessage("Failed to fetch users. Please try again later.");
+        setIsErrorModalOpen(true);
       } finally {
         setIsLoading(false);
       }
@@ -86,7 +96,7 @@ const Users = () => {
     setFilteredUsers(result);
   }, [users, searchTerm, selectedRole, sortConfig]);
 
-  // Three.js animation (giữ nguyên hiệu ứng hạt)
+  // Three.js animation (giữ nguyên)
   useEffect(() => {
     if (!threeCanvasRef.current) return;
 
@@ -112,8 +122,8 @@ const Users = () => {
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
 
-    const color1 = new THREE.Color(0xff6b00); // Orange
-    const color2 = new THREE.Color(0xff3300); // Red-orange
+    const color1 = new THREE.Color(0xff6b00);
+    const color2 = new THREE.Color(0xff3300);
 
     for (let i = 0; i < particleCount; i++) {
       positions[i * 3] = (Math.random() - 0.5) * 10;
@@ -249,9 +259,12 @@ const Users = () => {
         role: "USER",
         password: "",
       });
+      setModalMessage("User added successfully!");
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("Failed to add user:", error);
-      alert("Failed to add user. Please try again.");
+      setModalMessage("Failed to add user. Please try again.");
+      setIsErrorModalOpen(true);
     }
   };
 
@@ -263,22 +276,33 @@ const Users = () => {
         prev.map((user) => (user.id === updatedUser.id ? updatedUser : user))
       );
       setIsModalOpen(false);
+      setModalMessage("User updated successfully!");
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("Failed to update user:", error);
-      alert("Failed to update user. Please try again.");
+      setModalMessage("Failed to update user. Please try again.");
+      setIsErrorModalOpen(true);
     }
   };
 
   // Handle delete user
-  const handleDeleteUser = async (id) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
-      try {
-        await deleteUser(id);
-        setUsers((prev) => prev.filter((user) => user.id !== id));
-      } catch (error) {
-        console.error("Failed to delete user:", error);
-        alert("Failed to delete user. Please try again.");
-      }
+  const handleDeleteUser = (id) => {
+    setUserIdToDelete(id);
+    setIsConfirmDeleteModalOpen(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    try {
+      await deleteUser(userIdToDelete);
+      setUsers((prev) => prev.filter((user) => user.id !== userIdToDelete));
+      setIsConfirmDeleteModalOpen(false);
+      setModalMessage("User deleted successfully!");
+      setIsSuccessModalOpen(true);
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      setIsConfirmDeleteModalOpen(false);
+      setModalMessage("Failed to delete user. Please try again.");
+      setIsErrorModalOpen(true);
     }
   };
 
@@ -613,7 +637,7 @@ const Users = () => {
           )}
         </div>
 
-        {/* Pagination (Giữ nguyên, chưa tích hợp phân trang từ API) */}
+        {/* Pagination */}
         <div className="flex justify-between items-center mt-6">
           <div className="text-sm text-gray-400">
             Showing{" "}
@@ -893,6 +917,121 @@ const Users = () => {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {isSuccessModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-green-500/20 p-3 rounded-full">
+                <svg
+                  className="w-8 h-8 text-green-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-center text-green-400">
+              Success!
+            </h3>
+            <p className="text-gray-300 text-center mt-2">{modalMessage}</p>
+            <button
+              onClick={() => setIsSuccessModalOpen(false)}
+              className="w-full mt-6 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-all"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {isErrorModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-red-500/20 p-3 rounded-full">
+                <svg
+                  className="w-8 h-8 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-center text-red-400">
+              Error!
+            </h3>
+            <p className="text-gray-300 text-center mt-2">{modalMessage}</p>
+            <button
+              onClick={() => setIsErrorModalOpen(false)}
+              className="w-full mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Modal */}
+      {isConfirmDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-yellow-500/20 p-3 rounded-full">
+                <svg
+                  className="w-8 h-8 text-yellow-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-center text-yellow-400">
+              Confirm Delete
+            </h3>
+            <p className="text-gray-300 text-center mt-2">
+              Bạn có muốn xóa tài khoản này không ?
+            </p>
+            <div className="mt-6 flex space-x-4">
+              <button
+                onClick={confirmDeleteUser}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all"
+              >
+                Có
+              </button>
+              <button
+                onClick={() => setIsConfirmDeleteModalOpen(false)}
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all"
+              >
+                trở lại
+              </button>
             </div>
           </div>
         </div>
