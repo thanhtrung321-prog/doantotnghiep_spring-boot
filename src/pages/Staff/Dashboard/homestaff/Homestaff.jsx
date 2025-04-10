@@ -1,116 +1,165 @@
-import React, { useState, useEffect, useRef } from 'react';
-import * as THREE from 'three';
-import { Calendar, momentLocalizer } from 'react-big-calendar';
-import moment from 'moment';
-import 'react-big-calendar/lib/css/react-big-calendar.css'; // Đảm bảo import CSS của react-big-calendar
+import React, { useState, useEffect, useRef } from "react";
+import * as THREE from "three";
+import { Calendar, momentLocalizer } from "react-big-calendar";
+import moment from "moment";
+import "react-big-calendar/lib/css/react-big-calendar.css";
 
 const localizer = momentLocalizer(moment);
 
 const Homestaff = () => {
-  const [view, setView] = useState('table');
+  const [view, setView] = useState("table");
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filteredBookings, setFilteredBookings] = useState([]);
-  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFilter, setDateFilter] = useState("today");
   const [customDateRange, setCustomDateRange] = useState({
-    start: moment().format('YYYY-MM-DD'),
-    end: moment().format('YYYY-MM-DD'),
+    start: moment().format("YYYY-MM-DD"),
+    end: moment().format("YYYY-MM-DD"),
   });
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState("all");
   const threeCanvasRef = useRef(null);
 
   // Mock data
   useEffect(() => {
-    // Simulate API call
     setTimeout(() => {
       const mockBookings = [
         {
           id: 1,
-          customerName: 'Lisa Johnson',
-          serviceName: 'Hair Coloring + Cut',
+          customerName: "Lisa Johnson",
+          serviceName: "Hair Coloring + Cut",
           serviceId: 101,
           startTime: moment().hour(10).minute(0).second(0).toDate(),
           endTime: moment().hour(12).minute(0).second(0).toDate(),
-          status: 'confirmed',
-          notes: 'Blonde highlights, trim ends only',
-          customerPhone: '123-456-7890',
+          status: "confirmed",
+          notes: "Blonde highlights, trim ends only",
+          customerPhone: "123-456-7890",
         },
         {
           id: 2,
-          customerName: 'Michael Smith',
+          customerName: "Michael Smith",
           serviceName: "Men's Haircut",
           serviceId: 102,
-          startTime: moment().add(1, 'days').hour(14).minute(0).second(0).toDate(),
-          endTime: moment().add(1, 'days').hour(15).minute(0).second(0).toDate(),
-          status: 'pending',
-          notes: 'Short on sides, leave top longer',
-          customerPhone: '234-567-8901',
+          startTime: moment()
+            .add(1, "days")
+            .hour(14)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          endTime: moment()
+            .add(1, "days")
+            .hour(15)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          status: "pending",
+          notes: "Short on sides, leave top longer",
+          customerPhone: "234-567-8901",
         },
         {
           id: 3,
-          customerName: 'Jennifer Davis',
-          serviceName: 'Manicure & Pedicure',
+          customerName: "Jennifer Davis",
+          serviceName: "Manicure & Pedicure",
           serviceId: 103,
-          startTime: moment().subtract(1, 'days').hour(11).minute(0).second(0).toDate(),
-          endTime: moment().subtract(1, 'days').hour(13).minute(0).second(0).toDate(),
-          status: 'canceled',
-          notes: 'Red polish for nails',
-          customerPhone: '345-678-9012',
+          startTime: moment()
+            .subtract(1, "days")
+            .hour(11)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          endTime: moment()
+            .subtract(1, "days")
+            .hour(13)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          status: "canceled",
+          notes: "Red polish for nails",
+          customerPhone: "345-678-9012",
         },
         {
           id: 4,
-          customerName: 'Robert Williams',
-          serviceName: 'Beard Trim',
+          customerName: "Robert Williams",
+          serviceName: "Beard Trim",
           serviceId: 104,
           startTime: moment().hour(16).minute(0).second(0).toDate(),
           endTime: moment().hour(16).minute(30).second(0).toDate(),
-          status: 'confirmed',
-          notes: 'Clean shape, not too short',
-          customerPhone: '456-789-0123',
+          status: "confirmed",
+          notes: "Clean shape, not too short",
+          customerPhone: "456-789-0123",
         },
         {
           id: 5,
-          customerName: 'Sarah Miller',
-          serviceName: 'Full Facial',
+          customerName: "Sarah Miller",
+          serviceName: "Full Facial",
           serviceId: 105,
-          startTime: moment().add(2, 'days').hour(13).minute(0).second(0).toDate(),
-          endTime: moment().add(2, 'days').hour(14).minute(30).second(0).toDate(),
-          status: 'pending',
-          notes: 'Sensitive skin, avoid fragrance',
-          customerPhone: '567-890-1234',
+          startTime: moment()
+            .add(2, "days")
+            .hour(13)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          endTime: moment()
+            .add(2, "days")
+            .hour(14)
+            .minute(30)
+            .second(0)
+            .toDate(),
+          status: "pending",
+          notes: "Sensitive skin, avoid fragrance",
+          customerPhone: "567-890-1234",
         },
         {
           id: 6,
-          customerName: 'David Brown',
-          serviceName: 'Hair Color Touch-up',
+          customerName: "David Brown",
+          serviceName: "Hair Color Touch-up",
           serviceId: 106,
-          startTime: moment().add(1, 'days').hour(10).minute(0).second(0).toDate(),
-          endTime: moment().add(1, 'days').hour(11).minute(30).second(0).toDate(),
-          status: 'confirmed',
-          notes: 'Match previous color (dark brown)',
-          customerPhone: '678-901-2345',
+          startTime: moment()
+            .add(1, "days")
+            .hour(10)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          endTime: moment()
+            .add(1, "days")
+            .hour(11)
+            .minute(30)
+            .second(0)
+            .toDate(),
+          status: "confirmed",
+          notes: "Match previous color (dark brown)",
+          customerPhone: "678-901-2345",
         },
         {
           id: 7,
-          customerName: 'Emily Wilson',
-          serviceName: 'Hair Styling',
+          customerName: "Emily Wilson",
+          serviceName: "Hair Styling",
           serviceId: 107,
-          startTime: moment().add(3, 'days').hour(15).minute(0).second(0).toDate(),
-          endTime: moment().add(3, 'days').hour(16).minute(0).second(0).toDate(),
-          status: 'pending',
-          notes: 'Wedding guest hairstyle',
-          customerPhone: '789-012-3456',
+          startTime: moment()
+            .add(3, "days")
+            .hour(15)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          endTime: moment()
+            .add(3, "days")
+            .hour(16)
+            .minute(0)
+            .second(0)
+            .toDate(),
+          status: "pending",
+          notes: "Wedding guest hairstyle",
+          customerPhone: "789-012-3456",
         },
         {
           id: 8,
-          customerName: 'James Taylor',
-          serviceName: 'Scalp Treatment',
+          customerName: "James Taylor",
+          serviceName: "Scalp Treatment",
           serviceId: 108,
           startTime: moment().hour(9).minute(0).second(0).toDate(),
           endTime: moment().hour(10).minute(0).second(0).toDate(),
-          status: 'confirmed',
-          notes: 'Experiencing dry scalp',
-          customerPhone: '890-123-4567',
+          status: "confirmed",
+          notes: "Experiencing dry scalp",
+          customerPhone: "890-123-4567",
         },
       ];
 
@@ -125,63 +174,69 @@ const Homestaff = () => {
     if (bookings.length === 0) return;
 
     let filtered = [...bookings];
-
-    // Date filtering
-    const today = moment().startOf('day');
-    const tomorrow = moment().add(1, 'days').startOf('day');
-    const weekStart = moment().startOf('week');
-    const weekEnd = moment().endOf('week');
-    const monthStart = moment().startOf('month');
-    const monthEnd = moment().endOf('month');
+    const today = moment().startOf("day");
+    const tomorrow = moment().add(1, "days").startOf("day");
+    const weekStart = moment().startOf("week");
+    const weekEnd = moment().endOf("week");
+    const monthStart = moment().startOf("month");
+    const monthEnd = moment().endOf("month");
 
     switch (dateFilter) {
-      case 'today':
+      case "today":
         filtered = filtered.filter((booking) =>
-          moment(booking.startTime).isSame(today, 'day')
+          moment(booking.startTime).isSame(today, "day")
         );
         break;
-      case 'tomorrow':
+      case "tomorrow":
         filtered = filtered.filter((booking) =>
-          moment(booking.startTime).isSame(tomorrow, 'day')
+          moment(booking.startTime).isSame(tomorrow, "day")
         );
         break;
-      case 'thisWeek':
+      case "thisWeek":
         filtered = filtered.filter((booking) =>
-          moment(booking.startTime).isBetween(weekStart, weekEnd, 'day', '[]')
+          moment(booking.startTime).isBetween(weekStart, weekEnd, "day", "[]")
         );
         break;
-      case 'thisMonth':
+      case "thisMonth":
         filtered = filtered.filter((booking) =>
-          moment(booking.startTime).isBetween(monthStart, monthEnd, 'day', '[]')
+          moment(booking.startTime).isBetween(monthStart, monthEnd, "day", "[]")
         );
         break;
-      case 'custom':
-        const customStart = moment(customDateRange.start).startOf('day');
-        const customEnd = moment(customDateRange.end).endOf('day');
+      case "custom":
+        const customStart = moment(customDateRange.start).startOf("day");
+        const customEnd = moment(customDateRange.end).endOf("day");
         filtered = filtered.filter((booking) =>
-          moment(booking.startTime).isBetween(customStart, customEnd, 'day', '[]')
+          moment(booking.startTime).isBetween(
+            customStart,
+            customEnd,
+            "day",
+            "[]"
+          )
         );
         break;
       default:
-        // 'all' - no date filtering
         break;
     }
 
-    // Status filtering
-    if (statusFilter !== 'all') {
+    if (statusFilter !== "all") {
       filtered = filtered.filter((booking) => booking.status === statusFilter);
     }
 
     setFilteredBookings(filtered);
   }, [bookings, dateFilter, statusFilter, customDateRange]);
 
-  // Initialize Three.js animation
+  // Initialize Three.js animation (Snowfall)
   useEffect(() => {
     if (!threeCanvasRef.current) return;
 
     // Scene setup
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / 150, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / 150,
+      0.1,
+      1000
+    );
     const renderer = new THREE.WebGLRenderer({
       canvas: threeCanvasRef.current,
       alpha: true,
@@ -191,63 +246,61 @@ const Homestaff = () => {
     renderer.setSize(window.innerWidth, 150);
     renderer.setClearColor(0x000000, 0);
 
-    // Create animated 3D elements
-    const geometry = new THREE.TorusGeometry(3, 1, 16, 100);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xff6600,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.6,
-    });
-    const torus = new THREE.Mesh(geometry, material);
-    scene.add(torus);
+    // Snow particles
+    const snowCount = 1000;
+    const snowGeometry = new THREE.BufferGeometry();
+    const snowPositions = new Float32Array(snowCount * 3);
+    const snowVelocities = new Float32Array(snowCount * 3); // Velocity for each snowflake
 
-    // Add particles
-    const particlesGeometry = new THREE.BufferGeometry();
-    const particleCount = 500;
+    // Initialize snowflake positions and velocities
+    for (let i = 0; i < snowCount; i++) {
+      snowPositions[i * 3] = (Math.random() - 0.5) * 20; // x
+      snowPositions[i * 3 + 1] = Math.random() * 10; // y (start above canvas)
+      snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 20; // z
 
-    const posArray = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount * 3; i++) {
-      posArray[i] = (Math.random() - 0.5) * 10;
+      snowVelocities[i * 3] = (Math.random() - 0.5) * 0.02; // x velocity (wind)
+      snowVelocities[i * 3 + 1] = -Math.random() * 0.05 - 0.05; // y velocity (falling)
+      snowVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02; // z velocity
     }
 
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    snowGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(snowPositions, 3)
+    );
 
-    const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.02,
-      color: 0xff4500,
+    const snowMaterial = new THREE.PointsMaterial({
+      size: 0.05,
+      color: 0xffffff, // White snowflakes
       transparent: true,
       opacity: 0.8,
     });
 
-    const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particlesMesh);
+    const snowMesh = new THREE.Points(snowGeometry, snowMaterial);
+    scene.add(snowMesh);
 
     // Camera positioning
     camera.position.z = 5;
-
-    // Mouse interaction
-    let mouseX = 0;
-    let mouseY = 0;
-
-    function onDocumentMouseMove(event) {
-      mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-      mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-    }
-
-    document.addEventListener('mousemove', onDocumentMouseMove);
 
     // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
 
-      torus.rotation.x += 0.01;
-      torus.rotation.y += 0.005;
+      // Update snowflake positions
+      const positions = snowMesh.geometry.attributes.position.array;
+      for (let i = 0; i < snowCount; i++) {
+        positions[i * 3] += snowVelocities[i * 3]; // Update x
+        positions[i * 3 + 1] += snowVelocities[i * 3 + 1]; // Update y
+        positions[i * 3 + 2] += snowVelocities[i * 3 + 2]; // Update z
 
-      // Respond to mouse movement
-      particlesMesh.rotation.y += mouseX * 0.001;
-      particlesMesh.rotation.x += mouseY * 0.001;
+        // Reset snowflake to top if it falls below canvas
+        if (positions[i * 3 + 1] < -5) {
+          positions[i * 3] = (Math.random() - 0.5) * 20; // Reset x
+          positions[i * 3 + 1] = 10; // Reset y to top
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 20; // Reset z
+        }
+      }
+
+      snowMesh.geometry.attributes.position.needsUpdate = true;
 
       renderer.render(scene, camera);
     };
@@ -261,18 +314,13 @@ const Homestaff = () => {
       renderer.setSize(window.innerWidth, 150);
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
 
     // Cleanup
     return () => {
-      window.removeEventListener('resize', handleResize);
-      document.removeEventListener('mousemove', onDocumentMouseMove);
-
-      // Dispose resources
-      geometry.dispose();
-      material.dispose();
-      particlesGeometry.dispose();
-      particlesMaterial.dispose();
+      window.removeEventListener("resize", handleResize);
+      snowGeometry.dispose();
+      snowMaterial.dispose();
       renderer.dispose();
     };
   }, []);
@@ -297,39 +345,39 @@ const Homestaff = () => {
   // Get status badge color
   const getStatusColor = (status) => {
     switch (status) {
-      case 'confirmed':
-        return 'bg-green-500';
-      case 'pending':
-        return 'bg-orange-500';
-      case 'canceled':
-        return 'bg-red-500';
+      case "confirmed":
+        return "bg-green-500";
+      case "pending":
+        return "bg-orange-500";
+      case "canceled":
+        return "bg-red-500";
       default:
-        return 'bg-gray-500';
+        return "bg-gray-500";
     }
   };
 
   // Calendar event style renderer
   const eventStyleGetter = (event) => {
     let style = {
-      borderRadius: '4px',
+      borderRadius: "4px",
       opacity: 0.95,
-      color: 'white',
-      border: '0px',
-      display: 'block',
+      color: "white",
+      border: "0px",
+      display: "block",
     };
 
     switch (event.status) {
-      case 'confirmed':
-        style.backgroundColor = '#059669'; // green
+      case "confirmed":
+        style.backgroundColor = "#059669";
         break;
-      case 'pending':
-        style.backgroundColor = '#F97316'; // orange
+      case "pending":
+        style.backgroundColor = "#F97316";
         break;
-      case 'canceled':
-        style.backgroundColor = '#EF4444'; // red
+      case "canceled":
+        style.backgroundColor = "#EF4444";
         break;
       default:
-        style.backgroundColor = '#6B7280'; // gray
+        style.backgroundColor = "#6B7280";
     }
 
     return { style };
@@ -348,7 +396,9 @@ const Homestaff = () => {
         <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-red-500">
           Staff Dashboard
         </h1>
-        <p className="text-gray-400 mt-2">Manage your appointments and schedule</p>
+        <p className="text-gray-400 mt-2">
+          Manage your appointments and schedule
+        </p>
       </div>
 
       {/* Stats Section */}
@@ -356,27 +406,29 @@ const Homestaff = () => {
         {[
           {
             title: "Today's Bookings",
-            count: bookings.filter((b) => moment(b.startTime).isSame(moment(), 'day')).length,
-            icon: 'clock',
-            color: 'from-orange-600 to-orange-500',
+            count: bookings.filter((b) =>
+              moment(b.startTime).isSame(moment(), "day")
+            ).length,
+            icon: "clock",
+            color: "from-orange-600 to-orange-500",
           },
           {
-            title: 'Pending Approval',
-            count: bookings.filter((b) => b.status === 'pending').length,
-            icon: 'hourglass',
-            color: 'from-yellow-600 to-yellow-500',
+            title: "Pending Approval",
+            count: bookings.filter((b) => b.status === "pending").length,
+            icon: "hourglass",
+            color: "from-yellow-600 to-yellow-500",
           },
           {
-            title: 'Confirmed',
-            count: bookings.filter((b) => b.status === 'confirmed').length,
-            icon: 'check',
-            color: 'from-green-600 to-green-500',
+            title: "Confirmed",
+            count: bookings.filter((b) => b.status === "confirmed").length,
+            icon: "check",
+            color: "from-green-600 to-green-500",
           },
           {
-            title: 'Canceled',
-            count: bookings.filter((b) => b.status === 'canceled').length,
-            icon: 'x',
-            color: 'from-red-600 to-red-500',
+            title: "Canceled",
+            count: bookings.filter((b) => b.status === "canceled").length,
+            icon: "x",
+            color: "from-red-600 to-red-500",
           },
         ].map((stat, idx) => (
           <div
@@ -391,7 +443,7 @@ const Homestaff = () => {
               <div
                 className={`bg-gradient-to-br ${stat.color} rounded-full p-3 text-white shadow-lg`}
               >
-                {stat.icon === 'clock' && (
+                {stat.icon === "clock" && (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-6 w-6"
@@ -407,7 +459,7 @@ const Homestaff = () => {
                     />
                   </svg>
                 )}
-                {stat.icon === 'hourglass' && (
+                {stat.icon === "hourglass" && (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-6 w-6"
@@ -423,7 +475,7 @@ const Homestaff = () => {
                     />
                   </svg>
                 )}
-                {stat.icon === 'check' && (
+                {stat.icon === "check" && (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-6 w-6"
@@ -439,7 +491,7 @@ const Homestaff = () => {
                     />
                   </svg>
                 )}
-                {stat.icon === 'x' && (
+                {stat.icon === "x" && (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-6 w-6"
@@ -465,7 +517,9 @@ const Homestaff = () => {
       <div className="mb-6 bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-400 mb-1">Date Filter</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Date Filter
+            </label>
             <select
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               value={dateFilter}
@@ -480,27 +534,37 @@ const Homestaff = () => {
             </select>
           </div>
 
-          {dateFilter === 'custom' && (
+          {dateFilter === "custom" && (
             <>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-400 mb-1">Start Date</label>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Start Date
+                </label>
                 <input
                   type="date"
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                   value={customDateRange.start}
                   onChange={(e) =>
-                    setCustomDateRange({ ...customDateRange, start: e.target.value })
+                    setCustomDateRange({
+                      ...customDateRange,
+                      start: e.target.value,
+                    })
                   }
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-400 mb-1">End Date</label>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  End Date
+                </label>
                 <input
                   type="date"
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                   value={customDateRange.end}
                   onChange={(e) =>
-                    setCustomDateRange({ ...customDateRange, end: e.target.value })
+                    setCustomDateRange({
+                      ...customDateRange,
+                      end: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -508,7 +572,9 @@ const Homestaff = () => {
           )}
 
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-400 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Status
+            </label>
             <select
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               value={statusFilter}
@@ -525,11 +591,11 @@ const Homestaff = () => {
             <div className="flex w-full space-x-2">
               <button
                 className={`flex-1 px-4 py-2 rounded-md focus:outline-none transition-colors ${
-                  view === 'table'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                  view === "table"
+                    ? "bg-orange-600 text-white"
+                    : "bg-gray-700 text-gray-200 hover:bg-gray-600"
                 }`}
-                onClick={() => setView('table')}
+                onClick={() => setView("table")}
               >
                 <span className="flex items-center justify-center">
                   <svg
@@ -551,11 +617,11 @@ const Homestaff = () => {
               </button>
               <button
                 className={`flex-1 px-4 py-2 rounded-md focus:outline-none transition-colors ${
-                  view === 'calendar'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                  view === "calendar"
+                    ? "bg-orange-600 text-white"
+                    : "bg-gray-700 text-gray-200 hover:bg-gray-600"
                 }`}
-                onClick={() => setView('calendar')}
+                onClick={() => setView("calendar")}
               >
                 <span className="flex items-center justify-center">
                   <svg
@@ -588,7 +654,7 @@ const Homestaff = () => {
       ) : (
         <>
           {/* Table View */}
-          {view === 'table' && (
+          {view === "table" && (
             <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
               {filteredBookings.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -635,7 +701,10 @@ const Homestaff = () => {
                     </thead>
                     <tbody className="bg-gray-800 divide-y divide-gray-700">
                       {filteredBookings.map((booking) => (
-                        <tr key={booking.id} className="hover:bg-gray-750 transition-colors">
+                        <tr
+                          key={booking.id}
+                          className="hover:bg-gray-750 transition-colors"
+                        >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="ml-2">
@@ -649,19 +718,24 @@ const Homestaff = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-white">{booking.serviceName}</div>
+                            <div className="text-sm text-white">
+                              {booking.serviceName}
+                            </div>
                             <div className="text-xs text-gray-400">
-                              {moment(booking.endTime).diff(moment(booking.startTime), 'minutes')}{' '}
+                              {moment(booking.endTime).diff(
+                                moment(booking.startTime),
+                                "minutes"
+                              )}{" "}
                               min
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-white">
-                              {moment(booking.startTime).format('MMM D, YYYY')}
+                              {moment(booking.startTime).format("MMM D, YYYY")}
                             </div>
                             <div className="text-xs text-gray-400">
-                              {moment(booking.startTime).format('h:mm A')} -{' '}
-                              {moment(booking.endTime).format('h:mm A')}
+                              {moment(booking.startTime).format("h:mm A")} -{" "}
+                              {moment(booking.endTime).format("h:mm A")}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -670,19 +744,22 @@ const Homestaff = () => {
                                 booking.status
                               )} text-white`}
                             >
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              {booking.status.charAt(0).toUpperCase() +
+                                booking.status.slice(1)}
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm text-gray-300 max-w-xs truncate">
-                              {booking.notes || 'No notes'}
+                              {booking.notes || "No notes"}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            {booking.status === 'pending' && (
+                            {booking.status === "pending" && (
                               <div className="flex justify-end space-x-2">
                                 <button
-                                  onClick={() => handleStatusChange(booking.id, 'confirmed')}
+                                  onClick={() =>
+                                    handleStatusChange(booking.id, "confirmed")
+                                  }
                                   className="text-green-400 hover:text-green-600 transition-colors"
                                 >
                                   <svg
@@ -701,7 +778,9 @@ const Homestaff = () => {
                                   </svg>
                                 </button>
                                 <button
-                                  onClick={() => handleStatusChange(booking.id, 'canceled')}
+                                  onClick={() =>
+                                    handleStatusChange(booking.id, "canceled")
+                                  }
                                   className="text-red-400 hover:text-red-600 transition-colors"
                                 >
                                   <svg
@@ -721,17 +800,21 @@ const Homestaff = () => {
                                 </button>
                               </div>
                             )}
-                            {booking.status === 'confirmed' && (
+                            {booking.status === "confirmed" && (
                               <button
-                                onClick={() => handleStatusChange(booking.id, 'canceled')}
+                                onClick={() =>
+                                  handleStatusChange(booking.id, "canceled")
+                                }
                                 className="text-red-400 hover:text-red-600 transition-colors"
                               >
                                 Cancel
                               </button>
                             )}
-                            {booking.status === 'canceled' && (
+                            {booking.status === "canceled" && (
                               <button
-                                onClick={() => handleStatusChange(booking.id, 'confirmed')}
+                                onClick={() =>
+                                  handleStatusChange(booking.id, "confirmed")
+                                }
                                 className="text-orange-400 hover:text-orange-600 transition-colors"
                               >
                                 Restore
@@ -759,7 +842,9 @@ const Homestaff = () => {
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
                   </svg>
-                  <h3 className="text-lg font-medium text-gray-300">No bookings found</h3>
+                  <h3 className="text-lg font-medium text-gray-300">
+                    No bookings found
+                  </h3>
                   <p className="text-gray-500 mt-1">
                     Try adjusting your filters to see more results.
                   </p>
@@ -769,7 +854,7 @@ const Homestaff = () => {
           )}
 
           {/* Calendar View */}
-          {view === 'calendar' && (
+          {view === "calendar" && (
             <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-4 h-screen max-h-[600px]">
               <div className="h-full">
                 <Calendar
@@ -777,14 +862,16 @@ const Homestaff = () => {
                   events={calendarEvents}
                   startAccessor="start"
                   endAccessor="end"
-                  style={{ height: '100%' }}
+                  style={{ height: "100%" }}
                   eventPropGetter={eventStyleGetter}
-                  views={['month', 'week', 'day']}
+                  views={["month", "week", "day"]}
                   defaultView="week"
                   formats={{
-                    timeGutterFormat: 'h:mm A',
+                    timeGutterFormat: "h:mm A",
                     eventTimeRangeFormat: ({ start, end }) => {
-                      return `${moment(start).format('h:mm A')} - ${moment(end).format('h:mm A')}`;
+                      return `${moment(start).format("h:mm A")} - ${moment(
+                        end
+                      ).format("h:mm A")}`;
                     },
                   }}
                   className="salon-calendar"
@@ -797,13 +884,11 @@ const Homestaff = () => {
 
       {/* Custom styles for react-big-calendar */}
       <style jsx>{`
-        /* Calendar custom styles */
         :global(.salon-calendar) {
           background-color: #1f2937;
           color: white;
           border-radius: 0.5rem;
         }
-
         :global(.salon-calendar .rbc-header) {
           background-color: #111827;
           color: #9ca3af;
@@ -813,78 +898,62 @@ const Homestaff = () => {
           font-size: 0.75rem;
           font-weight: 600;
         }
-
         :global(.salon-calendar .rbc-time-header) {
           background-color: #111827;
           border-bottom: 1px solid #374151;
         }
-
         :global(.salon-calendar .rbc-time-content) {
           background-color: #1f2937;
           border: none;
         }
-
         :global(.salon-calendar .rbc-timeslot-group) {
           background-color: #1f2937;
           border-bottom: 1px solid #374151;
         }
-
         :global(.salon-calendar .rbc-time-slot) {
           color: #9ca3af;
           font-size: 0.75rem;
         }
-
         :global(.salon-calendar .rbc-day-bg) {
           background-color: #1f2937;
           border-left: 1px solid #374151;
         }
-
         :global(.salon-calendar .rbc-day-bg.rbc-today) {
           background-color: #374151;
         }
-
         :global(.salon-calendar .rbc-event) {
           padding: 4px 8px;
           font-size: 0.875rem;
           border-radius: 4px;
         }
-
         :global(.salon-calendar .rbc-month-view) {
           background-color: #1f2937;
         }
-
         :global(.salon-calendar .rbc-month-row) {
           border-top: 1px solid #374151;
         }
-
         :global(.salon-calendar .rbc-date-cell) {
           color: #d1d5db;
           padding: 8px;
         }
-
         :global(.salon-calendar .rbc-off-range) {
           color: #6b7280;
         }
-
         :global(.salon-calendar .rbc-off-range-bg) {
           background-color: #111827;
         }
-
         :global(.salon-calendar .rbc-today) {
           background-color: #374151;
         }
-
         :global(.salon-calendar .rbc-btn-group button) {
           background-color: #374151;
           color: #d1d5db;
           border: 1px solid #4b5563;
         }
-
         :global(.salon-calendar .rbc-btn-group button:hover) {
           background-color: #4b5563;
           color: #ffffff;
         }
-
         :global(.salon-calendar .rbc-btn-group button.rbc-active) {
           background-color: #f97316;
           color: #ffffff;
