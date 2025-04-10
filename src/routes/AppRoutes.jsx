@@ -23,6 +23,9 @@ import Payments from "../pages/admin/Dashboard/homeadmin/Payments";
 import Salons from "../pages/admin/Dashboard/homeadmin/Salons";
 import Services from "../pages/admin/Dashboard/homeadmin/Services";
 import Users from "../pages/admin/Dashboard/homeadmin/Users";
+import HeaderStaff from "../pages/Staff/Dashboard/headerstaff/Headerstaff";
+import Footerstaff from "../pages/Staff/Dashboard/footerstaff/Footerstaff";
+import Homestaff from "../pages/Staff/Dashboard/homestaff/Homestaff";
 
 const AppRoutes = () => {
   return (
@@ -212,6 +215,16 @@ const AppRoutes = () => {
             <HeaderAdmin />
             <Users />
             <Footeradmin />
+          </>
+        }
+      />
+      <Route
+        path="/staff"
+        element={
+          <>
+            <HeaderStaff />
+            <Homestaff />
+            <Footerstaff />
           </>
         }
       />
