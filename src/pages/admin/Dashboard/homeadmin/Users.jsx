@@ -29,17 +29,14 @@ const Users = () => {
     password: "",
   });
 
-  // State cho các modal thông báo
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] =
-    useState(false);
+  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
   const [userIdToDelete, setUserIdToDelete] = useState(null);
 
   const threeCanvasRef = useRef(null);
 
-  // Lấy danh sách người dùng từ API
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -58,7 +55,6 @@ const Users = () => {
     fetchUsers();
   }, []);
 
-  // Filter và sort người dùng
   useEffect(() => {
     let result = [...users];
 
@@ -96,7 +92,6 @@ const Users = () => {
     setFilteredUsers(result);
   }, [users, searchTerm, selectedRole, sortConfig]);
 
-  // Three.js animation (giữ nguyên)
   useEffect(() => {
     if (!threeCanvasRef.current) return;
 
@@ -200,7 +195,6 @@ const Users = () => {
     };
   }, []);
 
-  // Sorting functions
   const requestSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") {
@@ -214,13 +208,11 @@ const Users = () => {
     return sortConfig.direction === "asc" ? "↑" : "↓";
   };
 
-  // Handle user selection
   const handleUserSelect = (user) => {
     setSelectedUser(user);
     setIsModalOpen(true);
   };
 
-  // Format date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("en-US", {
@@ -232,19 +224,19 @@ const Users = () => {
     }).format(date);
   };
 
-  // Role badge color
   const getRoleBadgeColor = (role) => {
     switch (role.toLowerCase()) {
       case "admin":
         return "bg-red-500";
       case "staff":
         return "bg-orange-400";
+      case "owner":
+        return "bg-purple-500"; // Thêm màu cho OWNER
       default:
         return "bg-blue-500";
     }
   };
 
-  // Handle add user
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
@@ -268,7 +260,6 @@ const Users = () => {
     }
   };
 
-  // Handle update user
   const handleUpdateUser = async () => {
     try {
       const updatedUser = await updateUser(selectedUser.id, selectedUser);
@@ -285,7 +276,6 @@ const Users = () => {
     }
   };
 
-  // Handle delete user
   const handleDeleteUser = (id) => {
     setUserIdToDelete(id);
     setIsConfirmDeleteModalOpen(true);
@@ -308,9 +298,7 @@ const Users = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Main Content Container */}
       <div className="relative z-10 container mx-auto px-4 py-6">
-        {/* Page Title */}
         <div className="relative">
           <canvas
             ref={threeCanvasRef}
@@ -324,7 +312,6 @@ const Users = () => {
           </div>
         </div>
 
-        {/* Controls Section */}
         <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:w-1/3">
             <input
@@ -357,6 +344,7 @@ const Users = () => {
             >
               <option value="all">Tất cả quyền</option>
               <option value="admin">Quản Trị Viên</option>
+              <option value="owner">Quản trị salon</option>
               <option value="staff">Nhân viên</option>
               <option value="user">Người Dùng</option>
             </select>
@@ -383,12 +371,12 @@ const Users = () => {
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* Stats Cards - Cập nhật để hiển thị OWNER */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">Total Users</p>
+                <p className="text-gray-400 text-sm">Người Dùng</p>
                 <p className="text-2xl font-bold">
                   {users.filter((u) => u.role.toLowerCase() === "user").length}
                 </p>
@@ -414,7 +402,7 @@ const Users = () => {
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">Staff Members</p>
+                <p className="text-gray-400 text-sm">Nhân Viên</p>
                 <p className="text-2xl font-bold">
                   {users.filter((u) => u.role.toLowerCase() === "staff").length}
                 </p>
@@ -440,7 +428,7 @@ const Users = () => {
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">Administrators</p>
+                <p className="text-gray-400 text-sm">Quản Trị Viên</p>
                 <p className="text-2xl font-bold">
                   {users.filter((u) => u.role.toLowerCase() === "admin").length}
                 </p>
@@ -462,9 +450,34 @@ const Users = () => {
               </div>
             </div>
           </div>
+
+          <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-gray-400 text-sm">Quản Trị Salon</p>
+                <p className="text-2xl font-bold">
+                  {users.filter((u) => u.role.toLowerCase() === "owner").length}
+                </p>
+              </div>
+              <div className="bg-purple-500/20 p-3 rounded-full">
+                <svg
+                  className="w-6 h-6 text-purple-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 11c0-1.104-.896-2-2-2s-2 .896-2 2c0 .738.402 1.376 1 1.723v2.277h2v-2.277c.598-.347 1-.985 1-1.723zm8-2c0-1.104-.896-2-2-2s-2 .896-2 2c0 .738.402 1.376 1 1.723v2.277h2v-2.277c.598-.347 1-.985 1-1.723zm-16 0c0-1.104-.896-2-2-2s-2 .896-2 2c0 .738.402 1.376 1 1.723v2.277h2v-2.277c.598-.347 1-.985 1-1.723zm12 12h-8c-2.757 0-5-2.243-5-5v-2c0-2.757 2.243-5 5-5h8c2.757 0 5 2.243 5 5v2c0 2.757-2.243 5-5 5z"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Users Table */}
         <div className="bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-800">
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -637,7 +650,6 @@ const Users = () => {
           )}
         </div>
 
-        {/* Pagination */}
         <div className="flex justify-between items-center mt-6">
           <div className="text-sm text-gray-400">
             Showing{" "}
@@ -665,7 +677,6 @@ const Users = () => {
         </div>
       </div>
 
-      {/* Add User Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-fade-in">
@@ -685,7 +696,7 @@ const Users = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
+                    d="M6 18L18 6M6 6L12 12"
                   />
                 </svg>
               </button>
@@ -751,6 +762,7 @@ const Users = () => {
                   <option value="USER">Người Dùng</option>
                   <option value="STAFF">Nhân viên</option>
                   <option value="ADMIN">Quản Trị Viên</option>
+                  <option value="OWNER">Quản Trị Viên Salon</option>
                 </select>
               </div>
               <div>
@@ -776,7 +788,6 @@ const Users = () => {
         </div>
       )}
 
-      {/* User Details/Edit Modal */}
       {isModalOpen && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-fade-in">
@@ -829,9 +840,10 @@ const Users = () => {
                     selectedUser.role
                   )} bg-gray-800 border border-gray-700`}
                 >
-                  <option value="USER">USER</option>
-                  <option value="STAFF">STAFF</option>
-                  <option value="ADMIN">ADMIN</option>
+                  <option value="USER">Người Dùng</option>
+                  <option value="STAFF">Nhân viên</option>
+                  <option value="ADMIN">Quản Trị Viên</option>
+                  <option value="OWNER">Quản Trị Viên Salon</option>
                 </select>
               </div>
 
@@ -922,7 +934,6 @@ const Users = () => {
         </div>
       )}
 
-      {/* Success Modal */}
       {isSuccessModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
@@ -957,7 +968,6 @@ const Users = () => {
         </div>
       )}
 
-      {/* Error Modal */}
       {isErrorModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
@@ -992,7 +1002,6 @@ const Users = () => {
         </div>
       )}
 
-      {/* Confirm Delete Modal */}
       {isConfirmDeleteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
@@ -1030,7 +1039,7 @@ const Users = () => {
                 onClick={() => setIsConfirmDeleteModalOpen(false)}
                 className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all"
               >
-                trở lại
+                Trở lại
               </button>
             </div>
           </div>
