@@ -28,14 +28,17 @@ const Users = () => {
     role: "USER",
     password: "",
   });
-
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
+  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] =
+    useState(false);
   const [modalMessage, setModalMessage] = useState("");
   const [userIdToDelete, setUserIdToDelete] = useState(null);
 
   const threeCanvasRef = useRef(null);
+
+  // Lấy thông tin người dùng hiện tại từ localStorage
+  const currentUser = JSON.parse(localStorage.getItem("user")) || {};
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -69,7 +72,8 @@ const Users = () => {
       result = result.filter(
         (user) =>
           user.username.toLowerCase().includes(lowercasedSearch) ||
-          user.fullName.toLowerCase().includes(lowercasedSearch) ||
+          (user.fullName &&
+            user.fullName.toLowerCase().includes(lowercasedSearch)) ||
           user.email.toLowerCase().includes(lowercasedSearch) ||
           user.phone.includes(searchTerm)
       );
@@ -231,7 +235,7 @@ const Users = () => {
       case "staff":
         return "bg-orange-400";
       case "owner":
-        return "bg-purple-500"; // Thêm màu cho OWNER
+        return "bg-purple-500";
       default:
         return "bg-blue-500";
     }
@@ -261,6 +265,16 @@ const Users = () => {
   };
 
   const handleUpdateUser = async () => {
+    // Kiểm tra nếu currentUser là ADMIN và selectedUser cũng là ADMIN
+    if (
+      currentUser.role.toLowerCase() === "admin" &&
+      selectedUser.role.toLowerCase() === "admin"
+    ) {
+      setModalMessage("Admins cannot edit other admins.");
+      setIsErrorModalOpen(true);
+      return;
+    }
+
     try {
       const updatedUser = await updateUser(selectedUser.id, selectedUser);
       setUsers((prev) =>
@@ -294,6 +308,15 @@ const Users = () => {
       setModalMessage("Failed to delete user. Please try again.");
       setIsErrorModalOpen(true);
     }
+  };
+
+  // Hàm kiểm tra xem có thể chỉnh sửa không
+  const canEditUser = () => {
+    if (!selectedUser || !currentUser.role) return false;
+    return (
+      currentUser.role.toLowerCase() === "admin" &&
+      selectedUser.role.toLowerCase() !== "admin"
+    );
   };
 
   return (
@@ -371,7 +394,7 @@ const Users = () => {
           </button>
         </div>
 
-        {/* Stats Cards - Cập nhật để hiển thị OWNER */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
             <div className="flex justify-between items-center">
@@ -554,7 +577,7 @@ const Users = () => {
                         <td className="px-4 py-3">{user.id}</td>
                         <td className="px-4 py-3">{user.username}</td>
                         <td className="px-4 py-3 font-medium">
-                          {user.fullName}
+                          {user.fullName || "N/A"}
                         </td>
                         <td className="px-4 py-3 text-gray-300">
                           {user.email}
@@ -816,13 +839,15 @@ const Users = () => {
               <div className="flex flex-col items-center mb-6">
                 <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center text-3xl font-bold mb-3">
                   {selectedUser.fullName
-                    .split(" ")
-                    .map((name) => name[0])
-                    .join("")}
+                    ? selectedUser.fullName
+                        .split(" ")
+                        .map((name) => name[0])
+                        .join("")
+                    : "N/A"}
                 </div>
                 <input
                   type="text"
-                  value={selectedUser.fullName}
+                  value={selectedUser.fullName || ""}
                   onChange={(e) =>
                     setSelectedUser({
                       ...selectedUser,
@@ -830,6 +855,7 @@ const Users = () => {
                     })
                   }
                   className="text-xl font-bold bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-center"
+                  disabled={!canEditUser()}
                 />
                 <select
                   value={selectedUser.role}
@@ -839,6 +865,7 @@ const Users = () => {
                   className={`mt-1 px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(
                     selectedUser.role
                   )} bg-gray-800 border border-gray-700`}
+                  disabled={!canEditUser()}
                 >
                   <option value="USER">Người Dùng</option>
                   <option value="STAFF">Nhân viên</option>
@@ -861,6 +888,7 @@ const Users = () => {
                         })
                       }
                       className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
+                      disabled={!canEditUser()}
                     />
                   </div>
                   <div>
@@ -881,6 +909,7 @@ const Users = () => {
                       })
                     }
                     className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
+                    disabled={!canEditUser()}
                   />
                 </div>
 
@@ -896,6 +925,7 @@ const Users = () => {
                       })
                     }
                     className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
+                    disabled={!canEditUser()}
                   />
                 </div>
 
@@ -918,7 +948,12 @@ const Users = () => {
               <div className="mt-8 flex space-x-3">
                 <button
                   onClick={handleUpdateUser}
-                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all"
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                    canEditUser()
+                      ? "bg-orange-600 hover:bg-orange-700"
+                      : "bg-gray-600 cursor-not-allowed"
+                  }`}
+                  disabled={!canEditUser()}
                 >
                   Save Changes
                 </button>
@@ -1026,7 +1061,7 @@ const Users = () => {
               Confirm Delete
             </h3>
             <p className="text-gray-300 text-center mt-2">
-              Bạn có muốn xóa tài khoản này không ?
+              Bạn có muốn xóa tài khoản này không?
             </p>
             <div className="mt-6 flex space-x-4">
               <button
