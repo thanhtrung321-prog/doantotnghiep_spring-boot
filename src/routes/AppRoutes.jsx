@@ -1,48 +1,44 @@
-import { Routes, Route } from "react-router-dom";
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import Silider from "../components/Silider";
 import ServiceList from "../pages/Services/ServiceList";
 import Footer from "../components/Footer";
 import Collection from "../pages/collection/Collection";
 import BookingPage from "../pages/Booking/BookingPage";
 import Header from "../components/Header";
-import ServiceOverring from "../pages/home/ServiceOverring";
 import TablePrice from "../pages/tableprice/TablePrice";
 import SalonInfo from "../pages/Salon/Saloninfo";
 import About from "../pages/about/about";
 import Contact from "../pages/contact/Contact";
+import Profileuser from "../pages/profile/Profileuser";
+
+// Import các Dashboard
+import CustomerDashboard from "../pages/Dashboard/CustomerDashboard";
+import AdminDashboard from "../pages/Dashboard/AdminDashboard";
+import StaffDashboard from "../pages/Dashboard/StaffDashboard";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
-import Profileuser from "../pages/profile/Profileuser";
-import Footeradmin from "../pages/admin/Dashboard/footeradmin/footeradmin";
-import HeaderAdmin from "../pages/admin/Dashboard/headeradmin/headeradmin";
-import Dashboard from "../pages/admin/Dashboard/homeadmin/Dashboard";
-import Bookings from "../pages/admin/Dashboard/homeadmin/Bookings";
-import Categories from "../pages/admin/Dashboard/homeadmin/Categories";
-import Payments from "../pages/admin/Dashboard/homeadmin/Payments";
-import Salons from "../pages/admin/Dashboard/homeadmin/Salons";
-import Services from "../pages/admin/Dashboard/homeadmin/Services";
-import Users from "../pages/admin/Dashboard/homeadmin/Users";
-import HeaderStaff from "../pages/Staff/Dashboard/headerstaff/Headerstaff";
-import Footerstaff from "../pages/Staff/Dashboard/footerstaff/Footerstaff";
-import Homestaff from "../pages/Staff/Dashboard/homestaff/Homestaff";
+import Profile from "../pages/admin/Dashboard/homeadmin/Profile";
+
+// Component ProtectedRoute để bảo vệ các route dựa trên vai trò
+const ProtectedRoute = ({ allowedRoles, children }) => {
+  const user = JSON.parse(localStorage.getItem("user")) || {};
+  const token = localStorage.getItem("token");
+
+  // Kiểm tra xem người dùng đã đăng nhập và có vai trò phù hợp không
+  if (!token || !user.role || !allowedRoles.includes(user.role.toUpperCase())) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
 
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Trang chủ với Header, Navbar, Silider và Footer */}
-      <Route
-        path="/"
-        element={
-          <>
-            <Header />
-            <Navbar />
-            <Silider />
-            <ServiceOverring />
-            <Footer />
-          </>
-        }
-      />
+      {/* Trang chủ - Dành cho USER */}
+      <Route path="/" element={<CustomerDashboard />} />
+
       {/* Trang Dịch Vụ */}
       <Route
         path="/services"
@@ -55,6 +51,7 @@ const AppRoutes = () => {
           </>
         }
       />
+
       {/* Trang Mẫu Tóc */}
       <Route
         path="/collection"
@@ -66,17 +63,7 @@ const AppRoutes = () => {
           </>
         }
       />
-      {/* Trang Bảng Giá */}
-      <Route
-        path="/table_price"
-        element={
-          <>
-            <Navbar />
-            <BookingPage />
-            <Footer />
-          </>
-        }
-      />
+
       {/* Trang Liên Hệ */}
       <Route
         path="/about"
@@ -91,6 +78,7 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Trang Bảng Giá */}
       <Route
         path="/tableprice"
         element={
@@ -102,6 +90,8 @@ const AppRoutes = () => {
           </>
         }
       />
+
+      {/* Trang Liên Hệ */}
       <Route
         path="/contact"
         element={
@@ -114,120 +104,48 @@ const AppRoutes = () => {
         }
       />
 
-      <Route
-        path="/login"
-        element={
-          <>
-            <Header />
-            <Navbar />
-            <Login />
-            <Footer />
-          </>
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <>
-            <Header />
-            <Navbar />
-            <Register />
-            <Footer />
-          </>
-        }
-      />
-
+      {/* Trang Profile - Bảo vệ cho USER, STAFF, ADMIN */}
       <Route
         path="/profile"
         element={
-          <>
+          <ProtectedRoute allowedRoles={["USER", "STAFF", "ADMIN"]}>
             <Header />
             <Navbar />
             <Profileuser />
             <Footer />
-          </>
+          </ProtectedRoute>
         }
       />
+
+      {/* Trang Admin - Bảo vệ cho ADMIN */}
       <Route
-        path="/admin"
+        path="/admin/*" // Dùng wildcard để bao gồm tất cả sub-route
         element={
-          <>
-            <HeaderAdmin />
-            <Dashboard />
-            <Footeradmin />
-          </>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <AdminDashboard />
+          </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/booking"
-        element={
-          <>
-            <HeaderAdmin />
-            <Bookings />
-            <Footeradmin />
-          </>
-        }
-      />
-      <Route
-        path="/admin/category"
-        element={
-          <>
-            <HeaderAdmin />
-            <Categories />
-            <Footeradmin />
-          </>
-        }
-      />
-      <Route
-        path="/admin/payment"
-        element={
-          <>
-            <HeaderAdmin />
-            <Payments />
-            <Footeradmin />
-          </>
-        }
-      />
-      <Route
-        path="/admin/salon"
-        element={
-          <>
-            <HeaderAdmin />
-            <Salons />
-            <Footeradmin />
-          </>
-        }
-      />
-      <Route
-        path="/admin/service-offering"
-        element={
-          <>
-            <HeaderAdmin />
-            <Services />
-            <Footeradmin />
-          </>
-        }
-      />
-      <Route
-        path="/admin/user"
-        element={
-          <>
-            <HeaderAdmin />
-            <Users />
-            <Footeradmin />
-          </>
-        }
-      />
+
+      {/* Trang Staff - Bảo vệ cho STAFF */}
       <Route
         path="/staff"
         element={
-          <>
-            <HeaderStaff />
-            <Homestaff />
-            <Footerstaff />
-          </>
+          <ProtectedRoute allowedRoles={["STAFF"]}>
+            <StaffDashboard />
+          </ProtectedRoute>
         }
       />
+
+      {/* Trang Đăng Nhập */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Trang Đăng Ký */}
+      <Route path="/register" element={<Register />} />
+      {/* Trang Đặt Lịch */}
+
+      {/* Route mặc định khi không khớp */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 };

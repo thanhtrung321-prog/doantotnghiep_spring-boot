@@ -22,7 +22,24 @@ const Login = () => {
     const user = await loginUser(email, password);
 
     if (user) {
-      setShowSuccessModal(true); // Hiện modal khi đăng nhập thành công
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("token", user.token);
+      setShowSuccessModal(true);
+
+      setTimeout(() => {
+        switch (user.role.toUpperCase()) {
+          case "ADMIN":
+            window.location.href = "/admin";
+            break;
+          case "STAFF":
+            window.location.href = "/staff";
+            break;
+          case "USER":
+          default:
+            window.location.href = "/";
+            break;
+        }
+      }, 2000);
     } else {
       setError("Sai email hoặc mật khẩu.");
     }
@@ -126,12 +143,7 @@ const Login = () => {
             >
               <h2>🎉 Đăng nhập thành công!</h2>
               <p>Chào mừng bạn trở lại, {email}.</p>
-              <button
-                onClick={() => (window.location.href = "/")}
-                className="modal-button"
-              >
-                Tiếp tục
-              </button>
+              {/* Không cần button "Tiếp tục" vì sẽ tự động điều hướng */}
             </motion.div>
           </div>
         )}

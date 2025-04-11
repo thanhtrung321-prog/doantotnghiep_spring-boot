@@ -1,10 +1,14 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom"; // Import Link từ react-router-dom
+import { Link, useNavigate } from "react-router-dom"; // Thêm useNavigate để điều hướng
 
 const HeaderAdmin = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Lấy thông tin người dùng từ localStorage
+  const user = JSON.parse(localStorage.getItem("user")) || {};
+  const navigate = useNavigate(); // Hook để điều hướng
 
   // Services list for admin navigation
   const services = [
@@ -47,6 +51,13 @@ const HeaderAdmin = () => {
   ];
 
   const [activeService, setActiveService] = useState("dashboard");
+
+  // Hàm xử lý đăng xuất
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    navigate("/login"); // Chuyển hướng về trang đăng nhập
+  };
 
   return (
     <header className="bg-gradient-to-r from-purple-800 to-indigo-900 shadow-lg">
@@ -371,13 +382,17 @@ const HeaderAdmin = () => {
                 <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
                   <div className="py-3 px-4 border-b border-gray-100 bg-gray-50 rounded-t-md">
                     <p className="text-sm font-medium text-gray-800">
-                      Admin User
+                      {user.fullName || "Unknown User"}{" "}
+                      {/* Hiển thị tên người dùng */}
                     </p>
-                    <p className="text-xs text-gray-500">admin@glamsalon.com</p>
+                    <p className="text-xs text-gray-500">
+                      {user.email || "No email available"}{" "}
+                      {/* Hiển thị email */}
+                    </p>
                   </div>
                   <div className="py-1" role="menu" aria-orientation="vertical">
                     <Link
-                      to="/admin/profile"
+                      to="/admin/profile" // Chuyển đến trang profile chung
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                       role="menuitem"
                     >
@@ -395,7 +410,7 @@ const HeaderAdmin = () => {
                           d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                         />
                       </svg>
-                      Your Profile
+                      Thông Tin Cá Nhân
                     </Link>
                     <Link
                       to="/admin/settings"
@@ -422,11 +437,11 @@ const HeaderAdmin = () => {
                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                         />
                       </svg>
-                      Settings
+                      Cài Đặt
                     </Link>
-                    <Link
-                      to="/logout"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center text-red-600 hover:text-red-700"
+                    <button
+                      onClick={handleLogout} // Gọi hàm đăng xuất
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 hover:text-red-700 flex items-center"
                       role="menuitem"
                     >
                       <svg
@@ -443,8 +458,8 @@ const HeaderAdmin = () => {
                           d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                         />
                       </svg>
-                      Sign out
-                    </Link>
+                      Đăng Xuất
+                    </button>
                   </div>
                 </div>
               )}
@@ -457,7 +472,7 @@ const HeaderAdmin = () => {
       <div className={`lg:hidden ${isMobileMenuOpen ? "block" : "hidden"}`}>
         <div className="pt-2 pb-3 space-y-1 bg-indigo-900 border-t border-indigo-800">
           <Link
-            to="/admin/dashboard"
+            to="/admin"
             onClick={() => setActiveService("dashboard")}
             className={`${
               activeService === "dashboard"
