@@ -69,3 +69,39 @@ export const updateSalon = async (salonId, salon) => {
     throw error;
   }
 };
+
+// Upload hình ảnh cho salon
+export const uploadImages = async (salonId, files) => {
+  try {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    const response = await axios.post(
+      `${API_URL}/${salonId}/images`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    return response.data; // Trả về List<String> (đường dẫn hình ảnh)
+  } catch (error) {
+    console.error("Error uploading images:", error);
+    throw error;
+  }
+};
+
+// Xóa hình ảnh của salon
+export const deleteImage = async (salonId, imagePath) => {
+  try {
+    const response = await axios.post(
+      `${API_URL}/${salonId}/images/delete`,
+      null,
+      {
+        params: { imagePath },
+      }
+    );
+    return response.data; // Trả về thông báo thành công (String)
+  } catch (error) {
+    console.error("Error deleting image:", error);
+    throw error;
+  }
+};

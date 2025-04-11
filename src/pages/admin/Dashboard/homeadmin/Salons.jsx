@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import {
@@ -16,9 +17,9 @@ import {
   Grid,
   List,
   Home,
-  Settings,
-  Calendar,
 } from "lucide-react";
+import TimePicker from "react-time-picker";
+import "react-time-picker/dist/TimePicker.css";
 import {
   getAllSalons,
   createSalon,
@@ -28,7 +29,7 @@ import {
 
 const Salons = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState("grid");
   const [salons, setSalons] = useState([]);
   const [selectedSalon, setSelectedSalon] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -37,26 +38,37 @@ const Salons = () => {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
+  const [formErrors, setFormErrors] = useState({});
+
+  const user = JSON.parse(localStorage.getItem("user")) || {};
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user.id) {
+      setModalMessage("Please log in to manage salons.");
+      setIsErrorModalOpen(true);
+      setTimeout(() => navigate("/login"), 2000);
+    }
+  }, [user.id, navigate]);
 
   const [newSalonData, setNewSalonData] = useState({
     name: "",
     address: "",
     city: "",
-    opening_time: "",
-    closing_time: "",
+    openingTime: "09:00",
+    closingTime: "21:00",
     contact: "",
     email: "",
-    owner_id: 1, // Mặc định owner_id là 1, có thể thay đổi
+    ownerId: user.id || 1,
+    images: [],
   });
 
-  // Three.js refs
   const threeContainerRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const rendererRef = useRef(null);
   const cubesRef = useRef([]);
 
-  // Lấy danh sách salon từ API
   useEffect(() => {
     const fetchSalons = async () => {
       try {
@@ -70,13 +82,11 @@ const Salons = () => {
         setIsLoading(false);
       }
     };
-    fetchSalons();
-  }, []);
+    if (user.id) fetchSalons();
+  }, [user.id]);
 
-  // Initialize Three.js scene
   useEffect(() => {
     if (!threeContainerRef.current) return;
-
     const width = threeContainerRef.current.clientWidth;
     const height = threeContainerRef.current.clientHeight;
 
@@ -192,38 +202,88 @@ const Salons = () => {
     };
   }, []);
 
-  // Handle view details
-  const handleViewDetails = (salon) => {
-    setSelectedSalon(salon);
-    setIsDetailModalOpen(true);
+  const validateForm = () => {
+    const errors = {};
+    if (!newSalonData.name.trim()) errors.name = "Tên salon là bắt buộc";
+    if (!newSalonData.address.trim()) errors.address = "Địa chỉ là bắt buộc";
+    if (!newSalonData.city.trim()) errors.city = "Thành phố là bắt buộc";
+    if (!newSalonData.openingTime)
+      errors.openingTime = "Giờ mở cửa là bắt buộc";
+    if (!newSalonData.closingTime)
+      errors.closingTime = "Giờ đóng cửa là bắt buộc";
+    if (!newSalonData.contact.trim())
+      errors.contact = "Số điện thoại là bắt buộc";
+    if (!newSalonData.email.trim()) errors.email = "Email là bắt buộc";
+    else if (!/\S+@\S+\.\S+/.test(newSalonData.email))
+      errors.email = "Email không hợp lệ";
+    if (!newSalonData.ownerId) errors.ownerId = "Chủ sở hữu là bắt buộc";
+    return errors;
   };
 
-  // Handle add salon
   const handleAddSalon = async (e) => {
     e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     try {
-      const createdSalon = await createSalon(newSalonData);
+      const salonData = {
+        name: newSalonData.name,
+        address: newSalonData.address,
+        city: newSalonData.city,
+        openingTime: newSalonData.openingTime,
+        closingTime: newSalonData.closingTime,
+        contact: newSalonData.contact,
+        email: newSalonData.email,
+        ownerId: newSalonData.ownerId,
+        images:
+          newSalonData.images.length > 0
+            ? newSalonData.images
+            : ["image1.jpg", "image2.jpg"], // Default images if none provided
+      };
+
+      console.log("Sending salon data:", salonData);
+      const createdSalon = await createSalon(salonData);
       setSalons((prev) => [...prev, createdSalon]);
       setIsAddModalOpen(false);
       setNewSalonData({
         name: "",
         address: "",
         city: "",
-        opening_time: "",
-        closing_time: "",
+        openingTime: "09:00",
+        closingTime: "21:00",
         contact: "",
         email: "",
-        owner_id: 1,
+        ownerId: user.id || 1,
+        images: [],
       });
+      setFormErrors({});
       setModalMessage("Salon added successfully!");
       setIsSuccessModalOpen(true);
     } catch (error) {
-      setModalMessage("Failed to add salon. Please try again.");
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to add salon. Please try again.";
+      setModalMessage(errorMessage);
       setIsErrorModalOpen(true);
     }
   };
 
-  // Handle edit salon
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    // For simplicity, we'll store file names. In a real app, you'd upload files to a server.
+    const imageNames = files.map((file) => file.name);
+    setNewSalonData({ ...newSalonData, images: imageNames });
+  };
+
+  const handleViewDetails = (salon) => {
+    setSelectedSalon(salon);
+    setIsDetailModalOpen(true);
+  };
+
   const handleEditSalon = async () => {
     try {
       const updatedSalon = await updateSalon(selectedSalon.id, selectedSalon);
@@ -241,34 +301,20 @@ const Salons = () => {
     }
   };
 
-  // Handle delete salon (chưa có API delete trong backend, tạm comment)
   const handleDeleteSalon = (id) => {
-    // Vì backend chưa có endpoint DELETE, tạm thời chỉ xóa local
     setSalons((prev) => prev.filter((salon) => salon.id !== id));
     setModalMessage("Salon deleted successfully!");
     setIsSuccessModalOpen(true);
-    // Nếu backend thêm DELETE endpoint, uncomment và chỉnh sửa:
-    // try {
-    //   await deleteSalon(id);
-    //   setSalons((prev) => prev.filter((salon) => salon.id !== id));
-    //   setModalMessage("Salon deleted successfully!");
-    //   setIsSuccessModalOpen(true);
-    // } catch (error) {
-    //   setModalMessage("Failed to delete salon. Please try again.");
-    //   setIsErrorModalOpen(true);
-    // }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-900 text-white">
-      {/* Three.js Background */}
       <div
         ref={threeContainerRef}
         className="fixed inset-0 -z-10"
         aria-hidden="true"
       />
 
-      {/* Loading Screen */}
       {isLoading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900">
           <div className="space-y-6 text-center">
@@ -295,7 +341,6 @@ const Salons = () => {
           </p>
         </header>
 
-        {/* Search and Filters */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <div className="w-full md:w-96 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -344,6 +389,7 @@ const Salons = () => {
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors shadow-lg"
+              disabled={!user.id}
             >
               <Plus className="h-5 w-5 mr-2" />
               Thêm salon mới
@@ -351,7 +397,6 @@ const Salons = () => {
           </div>
         </div>
 
-        {/* Salons Display */}
         {viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {salons.map((salon) => (
@@ -361,11 +406,16 @@ const Salons = () => {
               >
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={salon.image || "/api/placeholder/600/400"}
+                    src={
+                      salon.images && salon.images.length > 0
+                        ? `http://localhost:8084/salon-images/${salon.images[0]}`
+                        : "/api/placeholder/600/400"
+                    }
                     alt={salon.name}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     loading="lazy"
                   />
+
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-80"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-4">
                     <h2 className="text-xl font-bold text-white">
@@ -384,7 +434,7 @@ const Salons = () => {
                   <div className="flex items-center text-gray-300">
                     <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     <span className="ml-2 text-sm">
-                      {salon.opening_time} - {salon.closing_time}
+                      {salon.openingTime} - {salon.closingTime}
                     </span>
                   </div>
 
@@ -479,7 +529,7 @@ const Salons = () => {
                           <div className="flex items-center">
                             <Clock className="h-4 w-4 mr-1 text-gray-400" />
                             <span>
-                              {salon.opening_time} - {salon.closing_time}
+                              {salon.openingTime} - {salon.closingTime}
                             </span>
                           </div>
                         </td>
@@ -529,7 +579,6 @@ const Salons = () => {
           </div>
         )}
 
-        {/* Pagination */}
         <div className="flex items-center justify-between mt-6">
           <div className="text-sm text-gray-400">
             Hiển thị{" "}
@@ -556,7 +605,6 @@ const Salons = () => {
         </div>
       </div>
 
-      {/* Add Salon Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-bounce-in">
@@ -590,9 +638,14 @@ const Salons = () => {
                   onChange={(e) =>
                     setNewSalonData({ ...newSalonData, name: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className={`w-full px-4 py-2 bg-gray-800 border ${
+                    formErrors.name ? "border-red-500" : "border-gray-700"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                   required
                 />
+                {formErrors.name && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-400">Địa chỉ</label>
@@ -605,9 +658,16 @@ const Salons = () => {
                       address: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className={`w-full px-4 py-2 bg-gray-800 border ${
+                    formErrors.address ? "border-red-500" : "border-gray-700"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                   required
                 />
+                {formErrors.address && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {formErrors.address}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-400">Thành phố</label>
@@ -617,41 +677,64 @@ const Salons = () => {
                   onChange={(e) =>
                     setNewSalonData({ ...newSalonData, city: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className={`w-full px-4 py-2 bg-gray-800 border ${
+                    formErrors.city ? "border-red-500" : "border-gray-700"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                   required
                 />
+                {formErrors.city && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.city}</p>
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-400">Giờ mở cửa</label>
-                <input
-                  type="text"
-                  value={newSalonData.opening_time}
-                  onChange={(e) =>
+                <TimePicker
+                  onChange={(value) =>
                     setNewSalonData({
                       ...newSalonData,
-                      opening_time: e.target.value,
+                      openingTime: value || "09:00",
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="VD: 09:00"
-                  required
+                  value={newSalonData.openingTime}
+                  format="HH:mm"
+                  disableClock
+                  clearIcon={null}
+                  className={`w-full px-4 py-2 bg-gray-800 border ${
+                    formErrors.openingTime
+                      ? "border-red-500"
+                      : "border-gray-700"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white`}
                 />
+                {formErrors.openingTime && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {formErrors.openingTime}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-400">Giờ đóng cửa</label>
-                <input
-                  type="text"
-                  value={newSalonData.closing_time}
-                  onChange={(e) =>
+                <TimePicker
+                  onChange={(value) =>
                     setNewSalonData({
                       ...newSalonData,
-                      closing_time: e.target.value,
+                      closingTime: value || "21:00",
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="VD: 21:00"
-                  required
+                  value={newSalonData.closingTime}
+                  format="HH:mm"
+                  disableClock
+                  clearIcon={null}
+                  className={`w-full px-4 py-2 bg-gray-800 border ${
+                    formErrors.closingTime
+                      ? "border-red-500"
+                      : "border-gray-700"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white`}
                 />
+                {formErrors.closingTime && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {formErrors.closingTime}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-400">Số điện thoại</label>
@@ -664,9 +747,16 @@ const Salons = () => {
                       contact: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className={`w-full px-4 py-2 bg-gray-800 border ${
+                    formErrors.contact ? "border-red-500" : "border-gray-700"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                   required
                 />
+                {formErrors.contact && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {formErrors.contact}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-400">Email</label>
@@ -676,9 +766,31 @@ const Salons = () => {
                   onChange={(e) =>
                     setNewSalonData({ ...newSalonData, email: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className={`w-full px-4 py-2 bg-gray-800 border ${
+                    formErrors.email ? "border-red-500" : "border-gray-700"
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
                   required
                 />
+                {formErrors.email && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {formErrors.email}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-sm text-gray-400">Hình ảnh</label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                />
+                {newSalonData.images.length > 0 && (
+                  <p className="text-gray-400 text-xs mt-1">
+                    {newSalonData.images.join(", ")}
+                  </p>
+                )}
               </div>
               <button
                 type="submit"
@@ -691,7 +803,6 @@ const Salons = () => {
         </div>
       )}
 
-      {/* Edit Salon Modal */}
       {isEditModalOpen && selectedSalon && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-bounce-in">
@@ -755,30 +866,34 @@ const Salons = () => {
               </div>
               <div>
                 <label className="text-sm text-gray-400">Giờ mở cửa</label>
-                <input
-                  type="text"
-                  value={selectedSalon.opening_time}
-                  onChange={(e) =>
+                <TimePicker
+                  onChange={(value) =>
                     setSelectedSalon({
                       ...selectedSalon,
-                      opening_time: e.target.value,
+                      openingTime: value || "09:00",
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  value={selectedSalon.openingTime}
+                  format="HH:mm"
+                  disableClock
+                  clearIcon={null}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
                 />
               </div>
               <div>
                 <label className="text-sm text-gray-400">Giờ đóng cửa</label>
-                <input
-                  type="text"
-                  value={selectedSalon.closing_time}
-                  onChange={(e) =>
+                <TimePicker
+                  onChange={(value) =>
                     setSelectedSalon({
                       ...selectedSalon,
-                      closing_time: e.target.value,
+                      closingTime: value || "21:00",
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  value={selectedSalon.closingTime}
+                  format="HH:mm"
+                  disableClock
+                  clearIcon={null}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
                 />
               </div>
               <div>
@@ -820,7 +935,6 @@ const Salons = () => {
         </div>
       )}
 
-      {/* Detail Modal */}
       {isDetailModalOpen && selectedSalon && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-black/60 backdrop-blur-sm"
@@ -857,7 +971,11 @@ const Salons = () => {
 
             <div className="mb-6 rounded-lg overflow-hidden">
               <img
-                src={selectedSalon.image || "/api/placeholder/600/400"}
+                src={
+                  selectedSalon.images && selectedSalon.images.length > 0
+                    ? `http://localhost:8084/salon-images/${selectedSalon.images[0]}`
+                    : "/api/placeholder/600/400"
+                }
                 alt={selectedSalon.name}
                 className="w-full h-56 object-cover"
               />
@@ -886,8 +1004,7 @@ const Salons = () => {
                   <div>
                     <p className="text-sm text-gray-400">Giờ mở cửa</p>
                     <p className="text-white">
-                      {selectedSalon.opening_time} -{" "}
-                      {selectedSalon.closing_time}
+                      {selectedSalon.openingTime} - {selectedSalon.closingTime}
                     </p>
                   </div>
                 </div>
@@ -924,7 +1041,7 @@ const Salons = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">ID Chủ sở hữu</p>
-                    <p className="text-white">{selectedSalon.owner_id}</p>
+                    <p className="text-white">{selectedSalon.ownerId}</p>
                   </div>
                 </div>
               </div>
@@ -963,7 +1080,6 @@ const Salons = () => {
         </div>
       )}
 
-      {/* Success Modal */}
       {isSuccessModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
@@ -998,7 +1114,6 @@ const Salons = () => {
         </div>
       )}
 
-      {/* Error Modal */}
       {isErrorModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
