@@ -90,6 +90,18 @@ const AppRoutes = () => {
           </>
         }
       />
+      {/*  trang booking  */}
+      <Route
+        path="/booking"
+        element={
+          <>
+            <Header />
+            <Navbar />
+            <BookingPage />
+            <Footer />
+          </>
+        }
+      />
 
       {/* Trang Liên Hệ */}
       <Route

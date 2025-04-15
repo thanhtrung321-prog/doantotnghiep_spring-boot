@@ -1,285 +1,540 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { vi } from "date-fns/locale";
+import QRCode from "react-qr-code";
+import Cookies from "js-cookie";
+import {
+  fetchSalons,
+  fetchCategoriesBySalon,
+  fetchServicesBySalon,
+  createBooking,
+} from "../../api/serviceoffering";
+import { getStaff } from "../../api/booking";
+import Navbar from "../../components/Navbar";
 
 const BookingPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    userId,
+    salonId,
+    services: preSelectedServices,
+  } = location.state || {};
+
+  const [user, setUser] = useState(null);
+  const [salons, setSalons] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [services, setServices] = useState([]);
+  const [allServices, setAllServices] = useState([]);
+  const [selectedSalon, setSelectedSalon] = useState(salonId || "");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedStaff, setSelectedStaff] = useState("");
+  const [selectedServices, setSelectedServices] = useState(() => {
+    // Load from cookie
+    const savedServices = Cookies.get("selectedServices");
+    let initialServices = savedServices ? JSON.parse(savedServices) : [];
+
+    // Merge with preSelectedServices
+    const preSelectedIds = preSelectedServices
+      ? preSelectedServices
+          .filter(
+            (s) => s.id && s.name && s.price != null && s.duration != null
+          )
+          .map((s) => s.id.toString())
+      : [];
+
+    // Combine, avoiding duplicates
+    return [...new Set([...initialServices, ...preSelectedIds])];
+  });
+  const [currentService, setCurrentService] = useState("");
+  const [startTime, setStartTime] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [bookingStatus, setBookingStatus] = useState("CHỜ XỬ LÝ");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+
+  // Calculate total price and duration
+  const selectedServiceDetails = allServices.filter((s) =>
+    selectedServices.includes(s.id.toString())
+  );
+  const totalPrice = selectedServiceDetails.reduce(
+    (sum, s) => sum + (s.price || 0),
+    0
+  );
+  const totalDuration = selectedServiceDetails.reduce(
+    (sum, s) => sum + (s.duration || 0),
+    0
+  );
+
+  // Estimate completion time
+  const completionTime = startTime
+    ? new Date(startTime.getTime() + totalDuration * 60000)
+    : null;
+
+  // Update cookie when selectedServices changes
+  useEffect(() => {
+    Cookies.set("selectedServices", JSON.stringify(selectedServices), {
+      expires: 1, // 1 day
+    });
+  }, [selectedServices]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+      navigate("/login");
+    }
+
+    fetchSalons()
+      .then((data) => setSalons(data || []))
+      .catch((err) => {
+        setError(err.message);
+        toast.error(err.message);
+      });
+
+    getStaff()
+      .then((data) => setStaff(data || []))
+      .catch((err) => {
+        setError(err.message);
+        toast.error(err.message);
+      });
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!selectedSalon) {
+      setCategories([]);
+      setServices([]);
+      setAllServices([]);
+      setSelectedCategory("");
+      setCurrentService("");
+      return;
+    }
+
+    const loadData = async () => {
+      try {
+        const [categoryData, allServicesData, filteredServicesData] =
+          await Promise.all([
+            fetchCategoriesBySalon(selectedSalon),
+            fetchServicesBySalon(selectedSalon, null),
+            fetchServicesBySalon(selectedSalon, selectedCategory || null),
+          ]);
+
+        const validAllServices = allServicesData.filter(
+          (s) => s.id && s.name && s.price != null && s.duration != null
+        );
+        const validFilteredServices = filteredServicesData.filter(
+          (s) => s.id && s.name && s.price != null && s.duration != null
+        );
+
+        // Validate selectedServices against new salon
+        const validSelectedServices = selectedServices.filter((id) => {
+          const isAvailable = validAllServices.some(
+            (s) => s.id.toString() === id
+          );
+          if (!isAvailable) {
+            const service =
+              allServices.find((s) => s.id.toString() === id) ||
+              preSelectedServices?.find((s) => s.id.toString() === id);
+            if (service) {
+              toast.error(
+                `Dịch vụ "${service.name}" không có sẵn tại salon này`
+              );
+            }
+          }
+          return isAvailable;
+        });
+
+        setCategories(categoryData || []);
+        setAllServices(validAllServices);
+        setServices(validFilteredServices);
+        setSelectedServices(validSelectedServices);
+        setCurrentService("");
+      } catch (err) {
+        setError(err.message);
+        toast.error(err.message);
+      }
+    };
+    loadData();
+  }, [selectedSalon, selectedCategory]);
+
+  const handleAddService = () => {
+    if (!currentService) {
+      toast.warn("Vui lòng chọn một dịch vụ");
+      return;
+    }
+    if (!selectedServices.includes(currentService)) {
+      setSelectedServices((prev) => [...prev, currentService]);
+      setCurrentService("");
+    } else {
+      toast.warn("Dịch vụ này đã được chọn");
+    }
+  };
+
+  const handleRemoveService = (serviceId) => {
+    setSelectedServices(selectedServices.filter((id) => id !== serviceId));
+  };
+
+  const handleShowInvoice = () => {
+    if (!selectedSalon || !startTime) {
+      toast.error("Vui lòng chọn salon và thời gian");
+      return;
+    }
+    if (!selectedServices.length) {
+      toast.warn("Bạn chưa chọn dịch vụ, hóa đơn sẽ hiển thị 0 VND.");
+    }
+    setShowInvoice(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!paymentMethod) {
+      toast.error("Vui lòng chọn phương thức thanh toán");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const bookingRequest = {
+      customerId: user?.id || userId,
+      startTime: startTime.toISOString(),
+      serviceIds: selectedServices,
+      staffId: selectedStaff || null,
+      paymentMethod: paymentMethod.toUpperCase().replace(" ", "_"),
+    };
+
+    try {
+      const booking = await createBooking(selectedSalon, bookingRequest);
+      setBookingStatus("CHỜ XỬ LÝ");
+      setShowQR(true);
+
+      setTimeout(() => {
+        const isSuccess = Math.random() > 0.2;
+        setBookingStatus(isSuccess ? "THÀNH CÔNG" : "THẤT BẠI");
+        if (isSuccess) {
+          Cookies.remove("selectedServices");
+          navigate("/booking", { state: { booking } });
+        } else {
+          setError("Đặt lịch thất bại. Vui lòng thử lại.");
+        }
+      }, 2000);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+      toast.error(err.message);
+    }
+  };
+
+  const qrCodeValue = `Payment for booking: ${selectedServices.join(
+    ","
+  )} at salon ${selectedSalon} via ${paymentMethod}`;
+
+  const filterTime = (time) => {
+    const hours = time.getHours();
+    return hours >= 9 && hours < 18;
+  };
+
   return (
-    <div className="container mx-auto px-4 py-16">
-      <div className="text-center mb-12">
-        <h3 className="text-3xl font-bold text-amber-800 mb-2">Đặt Lịch Hẹn</h3>
-        <div className="w-24 h-1 bg-amber-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">
-          Để có trải nghiệm tốt nhất, vui lòng đặt lịch trước khi đến salon
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        <div>
-          <div className="bg-white p-6 rounded-lg shadow mb-8">
-            <h4 className="text-xl font-semibold text-amber-800 mb-4">
-              Thông Tin Liên Hệ
-            </h4>
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-3 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                <p className="text-gray-600">
-                  236 Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh
-                </p>
-              </div>
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-3 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                  />
-                </svg>
-                <p className="text-gray-600">0912 345 678</p>
-              </div>
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-3 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                <p className="text-gray-600">info@maitocdep.vn</p>
-              </div>
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-3 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div>
-                  <p className="text-gray-600">Thứ 2 - Thứ 6: 9:00 - 20:00</p>
-                  <p className="text-gray-600">
-                    Thứ 7 - Chủ Nhật: 9:00 - 21:00
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <h4 className="text-lg font-semibold text-amber-800 mt-6 mb-3">
-              Kết Nối
-            </h4>
-            <div className="flex space-x-4">
-              <a
-                href="#"
-                className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center text-white hover:bg-amber-700 transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z" />
-                </svg>
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center text-white hover:bg-amber-700 transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                </svg>
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center text-white hover:bg-amber-700 transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
-                </svg>
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center text-white hover:bg-amber-700 transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M4.98 3.5c0 1.381-1.11 2.5-2.48 2.5s-2.48-1.119-2.48-2.5c0-1.38 1.11-2.5 2.48-2.5s2.48 1.12 2.48 2.5zm.02 4.5h-5v16h5v-16zm7.982 0h-4.968v16h4.969v-8.399c0-4.67 6.029-5.052 6.029 0v8.399h4.988v-10.131c0-7.88-8.922-7.593-11.018-3.714v-2.155z" />
-                </svg>
-              </a>
-            </div>
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
+      <ToastContainer />
+      <div className="container mx-auto px-4 py-10 mt-16">
+        <h1 className="text-3xl font-bold text-amber-900 mb-6">Đặt Lịch Hẹn</h1>
+        {error && <p className="text-red-500 mb-4">{error}</p>}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleShowInvoice();
+          }}
+          className="bg-white p-6 rounded-lg shadow-md max-w-lg mx-auto"
+        >
+          <div className="mb-6">
+            <label className="block text-amber-900 font-medium mb-2">
+              Chọn Salon
+            </label>
+            <select
+              value={selectedSalon}
+              onChange={(e) => {
+                setSelectedSalon(e.target.value);
+                setSelectedCategory("");
+                setCurrentService("");
+              }}
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+              required
+            >
+              <option value="">Chọn salon</option>
+              {salons.map((salon) => (
+                <option key={salon.id} value={salon.id}>
+                  {salon.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="bg-amber-50 p-6 rounded-lg">
-            <h4 className="text-xl font-semibold text-amber-800 mb-4">
-              Giờ Mở Cửa
-            </h4>
-            <ul className="space-y-2">
-              <li className="flex justify-between">
-                <span className="text-gray-600">Thứ 2</span>
-                <span className="font-medium">9:00 - 20:00</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-gray-600">Thứ 3</span>
-                <span className="font-medium">9:00 - 20:00</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-gray-600">Thứ 4</span>
-                <span className="font-medium">9:00 - 20:00</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-gray-600">Thứ 5</span>
-                <span className="font-medium">9:00 - 20:00</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-gray-600">Thứ 6</span>
-                <span className="font-medium">9:00 - 20:00</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-gray-600">Thứ 7</span>
-                <span className="font-medium">9:00 - 21:00</span>
-              </li>
-              <li className="flex justify-between">
-                <span className="text-gray-600">Chủ Nhật</span>
-                <span className="font-medium">9:00 - 21:00</span>
-              </li>
-            </ul>
+          <div className="mb-6">
+            <label className="block text-amber-900 font-medium mb-2">
+              Chọn Danh Mục Dịch Vụ (Tùy Chọn)
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+              disabled={!selectedSalon}
+            >
+              <option value="">Tất cả danh mục</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h4 className="text-xl font-semibold text-amber-800 mb-4">
-            Đặt Lịch Hẹn
-          </h4>
-          <form>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-700 mb-2">Họ Tên</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">
-                  Số Điện Thoại
-                </label>
-                <input
-                  type="tel"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">Ngày Hẹn</label>
-                <input
-                  type="date"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">Giờ Hẹn</label>
-                <input
-                  type="time"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">Dịch Vụ</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  required
-                >
-                  <option value="">Chọn dịch vụ</option>
-                  <option>Cắt Tóc</option>
-                  <option>Nhuộm Tóc</option>
-                  <option>Uốn Tóc</option>
-                  <option>Duỗi Tóc</option>
-                  <option>Spa Tóc</option>
-                  <option>Khác</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-2">Ghi Chú</label>
-                <textarea
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  rows="3"
-                ></textarea>
-              </div>
+          <div className="mb-6">
+            <label className="block text-amber-900 font-medium mb-2">
+              Chọn Dịch Vụ (Tùy Chọn)
+            </label>
+            <div className="flex items-center gap-2">
+              <select
+                value={currentService}
+                onChange={(e) => setCurrentService(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+                disabled={!services.length}
+              >
+                <option value="">Chọn dịch vụ</option>
+                {services
+                  .filter(
+                    (srv) => !selectedServices.includes(srv.id.toString())
+                  )
+                  .map((srv) => (
+                    <option key={srv.id} value={srv.id.toString()}>
+                      {srv.name} - {(srv.price || 0).toLocaleString("vi-VN")}{" "}
+                      VND ({srv.duration || 0} phút)
+                    </option>
+                  ))}
+              </select>
               <button
-                type="submit"
-                className="w-full bg-amber-600 text-white py-2 px-4 rounded-md hover:bg-amber-700 transition"
+                type="button"
+                onClick={handleAddService}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                disabled={!currentService}
               >
-                Đặt Lịch
+                Thêm
               </button>
             </div>
-          </form>
-        </div>
+            {selectedServiceDetails.length > 0 && (
+              <div className="mt-4">
+                <p className="text-amber-900 font-medium mb-2">
+                  Dịch vụ đã chọn:
+                </p>
+                <ul className="space-y-2">
+                  {selectedServiceDetails.map((srv) => (
+                    <li
+                      key={srv.id}
+                      className="flex justify-between items-center bg-gray-50 p-2 rounded"
+                    >
+                      <span>
+                        {srv.name} - {(srv.price || 0).toLocaleString("vi-VN")}{" "}
+                        VND ({srv.duration || 0} phút)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveService(srv.id.toString())}
+                        className="text-red-500 hover:text-red-700 font-semibold"
+                      >
+                        Xóa
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-amber-900 font-medium mb-2">
+              Chọn Nhân Viên (Tùy Chọn)
+            </label>
+            <select
+              value={selectedStaff}
+              onChange={(e) => setSelectedStaff(e.target.value)}
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+            >
+              <option value="">Không chọn</option>
+              {staff.map((staffMember) => (
+                <option key={staffMember.id} value={staffMember.id}>
+                  {staffMember.fullName || staffMember.email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-amber-900 font-medium mb-2">
+              Ngày và Giờ
+            </label>
+            <DatePicker
+              selected={startTime}
+              onChange={(date) => setStartTime(date)}
+              showTimeSelect
+              timeIntervals={30}
+              minDate={new Date()}
+              filterTime={filterTime}
+              dateFormat="dd/MM/yyyy HH:mm"
+              locale={vi}
+              placeholderText="Chọn ngày và giờ"
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+              required
+              wrapperClassName="w-full"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full py-3 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition ${
+              loading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            Xem Hóa Đơn
+          </button>
+        </form>
+
+        {showInvoice && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+              <h2 className="text-2xl font-bold text-amber-900 mb-4">
+                Hóa Đơn Đặt Lịch
+              </h2>
+              <div className="mb-4">
+                <p className="text-gray-700">
+                  <strong>Salon:</strong>{" "}
+                  {salons.find((s) => s.id == selectedSalon)?.name ||
+                    "Đang chọn"}
+                </p>
+                <p className="text-gray-700">
+                  <strong>Nhân viên:</strong>{" "}
+                  {staff.find((s) => s.id == selectedStaff)?.fullName ||
+                    "Không chọn"}
+                </p>
+                <p className="text-gray-700">
+                  <strong>Thời gian bắt đầu:</strong>{" "}
+                  {startTime
+                    ? startTime.toLocaleString("vi-VN", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })
+                    : "Chưa chọn"}
+                </p>
+                <p className="text-gray-700">
+                  <strong>Thời gian hoàn thành:</strong>{" "}
+                  {completionTime
+                    ? completionTime.toLocaleString("vi-VN", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })
+                    : "Không có dịch vụ"}
+                </p>
+              </div>
+              <h3 className="text-lg font-semibold text-amber-900 mb-2">
+                Dịch Vụ Đã Chọn
+                <span className="text-green-600 font-semibold ml-2">
+                  ({selectedServiceDetails.length} dịch vụ)
+                </span>
+              </h3>
+              <ul className="mb-4">
+                {selectedServiceDetails.length > 0 ? (
+                  selectedServiceDetails.map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex justify-between text-gray-700"
+                    >
+                      <span>{s.name}</span>
+                      <span>{(s.price || 0).toLocaleString("vi-VN")} VND</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-gray-700">
+                    Không có dịch vụ nào được chọn
+                  </li>
+                )}
+              </ul>
+              <p className="text-lg text-amber-700 font-bold">
+                Tổng cộng: {totalPrice.toLocaleString("vi-VN")} VND
+              </p>
+              <p className="text-gray-700 mt-2">
+                Tổng thời gian: {totalDuration} phút
+              </p>
+
+              <div className="mt-4">
+                <label className="block text-amber-900 font-medium mb-2">
+                  Phương Thức Thanh Toán
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+                >
+                  <option value="">Chọn phương thức</option>
+                  <option value="MoMo">MoMo</option>
+                  <option value="VNPay">VNPay</option>
+                  <option value="ZaloPay">ZaloPay</option>
+                  <option value="MBBank">MBBank</option>
+                </select>
+              </div>
+
+              {showQR && paymentMethod && (
+                <div className="mt-4 text-center">
+                  <p className="text-gray-700 mb-2">
+                    Quét mã QR để thanh toán qua {paymentMethod}
+                  </p>
+                  <QRCode value={qrCodeValue} size={150} />
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end gap-4">
+                <button
+                  onClick={() => setShowInvoice(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading || !paymentMethod}
+                  className={`px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 ${
+                    loading || !paymentMethod
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                  }`}
+                >
+                  {loading ? "Đang xử lý..." : "Xác Nhận Thanh Toán"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bookingStatus !== "CHỜ XỬ LÝ" && !showInvoice && (
+          <div className="mt-6 text-center">
+            <p
+              className={`text-lg ${
+                bookingStatus === "THÀNH CÔNG"
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              Đặt lịch {bookingStatus.toLowerCase()}!
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

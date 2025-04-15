@@ -17,6 +17,7 @@ import {
   Grid,
   List,
   Home,
+  X,
 } from "lucide-react";
 import TimePicker from "react-time-picker";
 import "react-time-picker/dist/TimePicker.css";
@@ -62,6 +63,7 @@ const Salons = () => {
     ownerId: user.id || 1,
     images: [],
   });
+  const [imagePreviews, setImagePreviews] = useState([]); // Stores temporary URLs for image previews
 
   const threeContainerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -241,10 +243,9 @@ const Salons = () => {
         images:
           newSalonData.images.length > 0
             ? newSalonData.images
-            : ["image1.jpg", "image2.jpg"], // Default images if none provided
+            : ["image1.jpg", "image2.jpg"],
       };
 
-      console.log("Sending salon data:", salonData);
       const createdSalon = await createSalon(salonData);
       setSalons((prev) => [...prev, createdSalon]);
       setIsAddModalOpen(false);
@@ -259,6 +260,7 @@ const Salons = () => {
         ownerId: user.id || 1,
         images: [],
       });
+      setImagePreviews([]);
       setFormErrors({});
       setModalMessage("Salon added successfully!");
       setIsSuccessModalOpen(true);
@@ -274,9 +276,27 @@ const Salons = () => {
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    // For simplicity, we'll store file names. In a real app, you'd upload files to a server.
     const imageNames = files.map((file) => file.name);
-    setNewSalonData({ ...newSalonData, images: imageNames });
+    const previews = files.map((file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(previews).then((previewUrls) => {
+      setNewSalonData({ ...newSalonData, images: imageNames });
+      setImagePreviews(previewUrls);
+    });
+  };
+
+  const handleRemoveImage = (index) => {
+    setNewSalonData({
+      ...newSalonData,
+      images: newSalonData.images.filter((_, i) => i !== index),
+    });
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
   };
 
   const handleViewDetails = (salon) => {
@@ -606,241 +626,293 @@ const Salons = () => {
       </div>
 
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-bounce-in">
-            <div className="flex justify-between items-center border-b border-gray-800 p-4">
-              <h3 className="text-xl font-bold">Thêm Salon Mới</h3>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-4xl rounded-xl shadow-2xl border border-gray-800 p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">
+                Thêm Salon Mới
+              </h3>
               <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="p-1 hover:bg-gray-800 rounded-full transition-all"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setFormErrors({});
+                  setImagePreviews([]);
+                }}
+                className="text-gray-400 hover:text-white transition"
               >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
-            <form onSubmit={handleAddSalon} className="p-6 space-y-4">
-              <div>
-                <label className="text-sm text-gray-400">Tên salon</label>
-                <input
-                  type="text"
-                  value={newSalonData.name}
-                  onChange={(e) =>
-                    setNewSalonData({ ...newSalonData, name: e.target.value })
-                  }
-                  className={`w-full px-4 py-2 bg-gray-800 border ${
-                    formErrors.name ? "border-red-500" : "border-gray-700"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                  required
-                />
-                {formErrors.name && (
-                  <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
-                )}
+            <form onSubmit={handleAddSalon} className="space-y-6 ">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Tên salon
+                  </label>
+                  <input
+                    type="text"
+                    value={newSalonData.name}
+                    onChange={(e) =>
+                      setNewSalonData({ ...newSalonData, name: e.target.value })
+                    }
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.name ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    placeholder="Nhập tên salon"
+                    required
+                  />
+                  {formErrors.name && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.name}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Thành phố
+                  </label>
+                  <input
+                    type="text"
+                    value={newSalonData.city}
+                    onChange={(e) =>
+                      setNewSalonData({ ...newSalonData, city: e.target.value })
+                    }
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.city ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    placeholder="Nhập thành phố"
+                    required
+                  />
+                  {formErrors.city && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.city}
+                    </p>
+                  )}
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Địa chỉ
+                  </label>
+                  <input
+                    type="text"
+                    value={newSalonData.address}
+                    onChange={(e) =>
+                      setNewSalonData({
+                        ...newSalonData,
+                        address: e.target.value,
+                      })
+                    }
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.address ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    placeholder="Nhập địa chỉ"
+                    required
+                  />
+                  {formErrors.address && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.address}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Giờ mở cửa
+                  </label>
+                  <TimePicker
+                    onChange={(value) =>
+                      setNewSalonData({
+                        ...newSalonData,
+                        openingTime: value || "09:00",
+                      })
+                    }
+                    value={newSalonData.openingTime}
+                    format="HH:mm"
+                    disableClock
+                    clearIcon={null}
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.openingTime
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                  />
+                  {formErrors.openingTime && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.openingTime}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Giờ đóng cửa
+                  </label>
+                  <TimePicker
+                    onChange={(value) =>
+                      setNewSalonData({
+                        ...newSalonData,
+                        closingTime: value || "21:00",
+                      })
+                    }
+                    value={newSalonData.closingTime}
+                    format="HH:mm"
+                    disableClock
+                    clearIcon={null}
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.closingTime
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                  />
+                  {formErrors.closingTime && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.closingTime}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="text"
+                    value={newSalonData.contact}
+                    onChange={(e) =>
+                      setNewSalonData({
+                        ...newSalonData,
+                        contact: e.target.value,
+                      })
+                    }
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.contact ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    placeholder="Nhập số điện thoại"
+                    required
+                  />
+                  {formErrors.contact && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.contact}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newSalonData.email}
+                    onChange={(e) =>
+                      setNewSalonData({
+                        ...newSalonData,
+                        email: e.target.value,
+                      })
+                    }
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.email ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    placeholder="Nhập email"
+                    required
+                  />
+                  {formErrors.email && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.email}
+                    </p>
+                  )}
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Hình ảnh
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                  />
+                  {imagePreviews.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            className="w-24 h-24 object-cover rounded-lg shadow-md border border-gray-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                            title="Xóa hình ảnh"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {newSalonData.images.length > 0 && (
+                    <p className="text-gray-400 text-xs mt-2">
+                      Đã chọn: {newSalonData.images.join(", ")}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="text-sm text-gray-400">Địa chỉ</label>
-                <input
-                  type="text"
-                  value={newSalonData.address}
-                  onChange={(e) =>
-                    setNewSalonData({
-                      ...newSalonData,
-                      address: e.target.value,
-                    })
-                  }
-                  className={`w-full px-4 py-2 bg-gray-800 border ${
-                    formErrors.address ? "border-red-500" : "border-gray-700"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                  required
-                />
-                {formErrors.address && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {formErrors.address}
-                  </p>
-                )}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setFormErrors({});
+                    setImagePreviews([]);
+                  }}
+                  className="px-5 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition shadow-sm"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition shadow-sm"
+                >
+                  Thêm Salon
+                </button>
               </div>
-              <div>
-                <label className="text-sm text-gray-400">Thành phố</label>
-                <input
-                  type="text"
-                  value={newSalonData.city}
-                  onChange={(e) =>
-                    setNewSalonData({ ...newSalonData, city: e.target.value })
-                  }
-                  className={`w-full px-4 py-2 bg-gray-800 border ${
-                    formErrors.city ? "border-red-500" : "border-gray-700"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                  required
-                />
-                {formErrors.city && (
-                  <p className="text-red-500 text-xs mt-1">{formErrors.city}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Giờ mở cửa</label>
-                <TimePicker
-                  onChange={(value) =>
-                    setNewSalonData({
-                      ...newSalonData,
-                      openingTime: value || "09:00",
-                    })
-                  }
-                  value={newSalonData.openingTime}
-                  format="HH:mm"
-                  disableClock
-                  clearIcon={null}
-                  className={`w-full px-4 py-2 bg-gray-800 border ${
-                    formErrors.openingTime
-                      ? "border-red-500"
-                      : "border-gray-700"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white`}
-                />
-                {formErrors.openingTime && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {formErrors.openingTime}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Giờ đóng cửa</label>
-                <TimePicker
-                  onChange={(value) =>
-                    setNewSalonData({
-                      ...newSalonData,
-                      closingTime: value || "21:00",
-                    })
-                  }
-                  value={newSalonData.closingTime}
-                  format="HH:mm"
-                  disableClock
-                  clearIcon={null}
-                  className={`w-full px-4 py-2 bg-gray-800 border ${
-                    formErrors.closingTime
-                      ? "border-red-500"
-                      : "border-gray-700"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white`}
-                />
-                {formErrors.closingTime && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {formErrors.closingTime}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Số điện thoại</label>
-                <input
-                  type="text"
-                  value={newSalonData.contact}
-                  onChange={(e) =>
-                    setNewSalonData({
-                      ...newSalonData,
-                      contact: e.target.value,
-                    })
-                  }
-                  className={`w-full px-4 py-2 bg-gray-800 border ${
-                    formErrors.contact ? "border-red-500" : "border-gray-700"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                  required
-                />
-                {formErrors.contact && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {formErrors.contact}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Email</label>
-                <input
-                  type="email"
-                  value={newSalonData.email}
-                  onChange={(e) =>
-                    setNewSalonData({ ...newSalonData, email: e.target.value })
-                  }
-                  className={`w-full px-4 py-2 bg-gray-800 border ${
-                    formErrors.email ? "border-red-500" : "border-gray-700"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                  required
-                />
-                {formErrors.email && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {formErrors.email}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Hình ảnh</label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                />
-                {newSalonData.images.length > 0 && (
-                  <p className="text-gray-400 text-xs mt-1">
-                    {newSalonData.images.join(", ")}
-                  </p>
-                )}
-              </div>
-              <button
-                type="submit"
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-all"
-              >
-                Thêm Salon
-              </button>
             </form>
           </div>
         </div>
       )}
 
       {isEditModalOpen && selectedSalon && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-bounce-in">
-            <div className="flex justify-between items-center border-b border-gray-800 p-4">
-              <h3 className="text-xl font-bold">Chỉnh sửa Salon</h3>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl border border-gray-800 p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">
+                Chỉnh sửa Salon
+              </h3>
               <button
                 onClick={() => setIsEditModalOpen(false)}
-                className="p-1 hover:bg-gray-800 rounded-full transition-all"
+                className="text-gray-400 hover:text-white transition"
               >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="space-y-6">
               <div>
-                <label className="text-sm text-gray-400">Tên salon</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Tên salon
+                </label>
                 <input
                   type="text"
                   value={selectedSalon.name}
                   onChange={(e) =>
                     setSelectedSalon({ ...selectedSalon, name: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Địa chỉ</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Địa chỉ
+                </label>
                 <input
                   type="text"
                   value={selectedSalon.address}
@@ -850,22 +922,26 @@ const Salons = () => {
                       address: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Thành phố</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Thành phố
+                </label>
                 <input
                   type="text"
                   value={selectedSalon.city}
                   onChange={(e) =>
                     setSelectedSalon({ ...selectedSalon, city: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Giờ mở cửa</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Giờ mở cửa
+                </label>
                 <TimePicker
                   onChange={(value) =>
                     setSelectedSalon({
@@ -877,11 +953,13 @@ const Salons = () => {
                   format="HH:mm"
                   disableClock
                   clearIcon={null}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Giờ đóng cửa</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Giờ đóng cửa
+                </label>
                 <TimePicker
                   onChange={(value) =>
                     setSelectedSalon({
@@ -893,11 +971,13 @@ const Salons = () => {
                   format="HH:mm"
                   disableClock
                   clearIcon={null}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Số điện thoại</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Số điện thoại
+                </label>
                 <input
                   type="text"
                   value={selectedSalon.contact}
@@ -907,11 +987,13 @@ const Salons = () => {
                       contact: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Email</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email
+                </label>
                 <input
                   type="email"
                   value={selectedSalon.email}
@@ -921,15 +1003,23 @@ const Salons = () => {
                       email: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
                 />
               </div>
-              <button
-                onClick={handleEditSalon}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-all"
-              >
-                Lưu thay đổi
-              </button>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-5 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition shadow-sm"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleEditSalon}
+                  className="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition shadow-sm"
+                >
+                  Lưu thay đổi
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -952,20 +1042,7 @@ const Salons = () => {
                 onClick={() => setIsDetailModalOpen(false)}
                 className="text-gray-400 hover:text-white"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
 
@@ -1081,8 +1158,8 @@ const Salons = () => {
       )}
 
       {isSuccessModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6">
             <div className="flex items-center justify-center mb-4">
               <div className="bg-green-500/20 p-3 rounded-full">
                 <svg
@@ -1115,23 +1192,11 @@ const Salons = () => {
       )}
 
       {isErrorModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6">
             <div className="flex items-center justify-center mb-4">
               <div className="bg-red-500/20 p-3 rounded-full">
-                <svg
-                  className="w-8 h-8 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="w-8 h-8 text-red-500" />
               </div>
             </div>
             <h3 className="text-xl font-bold text-center text-red-400">Lỗi!</h3>
