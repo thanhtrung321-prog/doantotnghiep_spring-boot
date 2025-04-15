@@ -7,14 +7,32 @@ import "react-datepicker/dist/react-datepicker.css";
 import { vi } from "date-fns/locale";
 import QRCode from "react-qr-code";
 import Cookies from "js-cookie";
+import axios from "axios";
 import {
-  fetchSalons,
   fetchCategoriesBySalon,
   fetchServicesBySalon,
   createBooking,
 } from "../../api/serviceoffering";
 import { getStaff } from "../../api/booking";
 import Navbar from "../../components/Navbar";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+} from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Fix Leaflet default marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
 const BookingPage = () => {
   const navigate = useNavigate();
@@ -35,11 +53,7 @@ const BookingPage = () => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStaff, setSelectedStaff] = useState("");
   const [selectedServices, setSelectedServices] = useState(() => {
-    // Load from cookie
     const savedServices = Cookies.get("selectedServices");
-    let initialServices = savedServices ? JSON.parse(savedServices) : [];
-
-    // Merge with preSelectedServices
     const preSelectedIds = preSelectedServices
       ? preSelectedServices
           .filter(
@@ -47,9 +61,9 @@ const BookingPage = () => {
           )
           .map((s) => s.id.toString())
       : [];
-
-    // Combine, avoiding duplicates
-    return [...new Set([...initialServices, ...preSelectedIds])];
+    return savedServices
+      ? [...new Set([...JSON.parse(savedServices), ...preSelectedIds])]
+      : preSelectedIds;
   });
   const [currentService, setCurrentService] = useState("");
   const [startTime, setStartTime] = useState(null);
@@ -59,6 +73,10 @@ const BookingPage = () => {
   const [loading, setLoading] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [salonAddress, setSalonAddress] = useState("");
+  const [salonLocation, setSalonLocation] = useState(null);
+  const [showMap, setShowMap] = useState(false);
 
   // Calculate total price and duration
   const selectedServiceDetails = allServices.filter((s) =>
@@ -81,10 +99,11 @@ const BookingPage = () => {
   // Update cookie when selectedServices changes
   useEffect(() => {
     Cookies.set("selectedServices", JSON.stringify(selectedServices), {
-      expires: 1, // 1 day
+      expires: 1,
     });
   }, [selectedServices]);
 
+  // Fetch user data and salons
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -93,11 +112,12 @@ const BookingPage = () => {
       navigate("/login");
     }
 
-    fetchSalons()
+    fetch("http://localhost:8084/salon")
+      .then((res) => res.json())
       .then((data) => setSalons(data || []))
       .catch((err) => {
         setError(err.message);
-        toast.error(err.message);
+        toast.error("Không thể tải danh sách salon: " + err.message);
       });
 
     getStaff()
@@ -108,6 +128,59 @@ const BookingPage = () => {
       });
   }, [navigate]);
 
+  // Fetch user location
+  const fetchUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          setShowMap(true);
+        },
+        (err) => {
+          toast.warn(
+            "Không thể lấy vị trí của bạn. Vui lòng bật quyền truy cập vị trí."
+          );
+          console.error("Geolocation error:", err);
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      toast.error("Trình duyệt không hỗ trợ định vị.");
+    }
+  };
+
+  // Geocode salon address using Nominatim
+  const geocodeAddress = async (address) => {
+    try {
+      const response = await axios.get(
+        "https://nominatim.openstreetmap.org/search",
+        {
+          params: {
+            q: address,
+            format: "json",
+            limit: 1,
+          },
+          headers: {
+            "User-Agent": "YourAppName/1.0 (your.email@example.com)", // Thay bằng email của bạn
+          },
+        }
+      );
+      if (response.data && response.data.length > 0) {
+        const { lat, lon } = response.data[0];
+        return { lat: parseFloat(lat), lng: parseFloat(lon) };
+      } else {
+        throw new Error("Không tìm thấy tọa độ cho địa chỉ này");
+      }
+    } catch (err) {
+      console.error("Geocoding error:", err);
+      throw err;
+    }
+  };
+
+  // Fetch salon data and services
   useEffect(() => {
     if (!selectedSalon) {
       setCategories([]);
@@ -115,16 +188,22 @@ const BookingPage = () => {
       setAllServices([]);
       setSelectedCategory("");
       setCurrentService("");
+      setSalonAddress("");
+      setSalonLocation(null);
+      setShowMap(false);
       return;
     }
 
     const loadData = async () => {
       try {
-        const [categoryData, allServicesData, filteredServicesData] =
+        const [categoryData, allServicesData, filteredServicesData, salonData] =
           await Promise.all([
             fetchCategoriesBySalon(selectedSalon),
             fetchServicesBySalon(selectedSalon, null),
             fetchServicesBySalon(selectedSalon, selectedCategory || null),
+            fetch(`http://localhost:8084/salon/${selectedSalon}`).then((res) =>
+              res.json()
+            ),
           ]);
 
         const validAllServices = allServicesData.filter(
@@ -134,7 +213,6 @@ const BookingPage = () => {
           (s) => s.id && s.name && s.price != null && s.duration != null
         );
 
-        // Validate selectedServices against new salon
         const validSelectedServices = selectedServices.filter((id) => {
           const isAvailable = validAllServices.some(
             (s) => s.id.toString() === id
@@ -157,6 +235,22 @@ const BookingPage = () => {
         setServices(validFilteredServices);
         setSelectedServices(validSelectedServices);
         setCurrentService("");
+        const fullAddress = `${salonData.address}, ${salonData.city}, Vietnam`;
+        setSalonAddress(fullAddress);
+
+        // Geocode salon address
+        try {
+          const coords = await geocodeAddress(fullAddress);
+          setSalonLocation(coords);
+        } catch (err) {
+          toast.warn(
+            "Không thể lấy tọa độ salon. Sử dụng tọa độ mặc định (TP.HCM)."
+          );
+          setSalonLocation({
+            lat: 10.7769,
+            lng: 106.7009,
+          });
+        }
       } catch (err) {
         setError(err.message);
         toast.error(err.message);
@@ -240,6 +334,15 @@ const BookingPage = () => {
     const hours = time.getHours();
     return hours >= 9 && hours < 18;
   };
+
+  // Đường đi đơn giản (đường thẳng) giữa userLocation và salonLocation
+  const path =
+    userLocation && salonLocation
+      ? [
+          [userLocation.lat, userLocation.lng],
+          [salonLocation.lat, salonLocation.lng],
+        ]
+      : [];
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -406,6 +509,55 @@ const BookingPage = () => {
             Xem Hóa Đơn
           </button>
         </form>
+
+        {/* Button to Show Directions */}
+        {selectedSalon && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={fetchUserLocation}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Chỉ Đường Đến Salon
+            </button>
+          </div>
+        )}
+
+        {/* React-Leaflet Map Section */}
+        {showMap && selectedSalon && userLocation && salonLocation && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-amber-900 mb-4">
+              Đường đi đến{" "}
+              {salons.find((s) => s.id == selectedSalon)?.name || "Salon"}
+            </h2>
+            <MapContainer
+              center={[userLocation.lat, userLocation.lng]}
+              zoom={12}
+              style={{ height: "400px", width: "100%" }}
+              className="rounded-lg shadow-md"
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <Marker position={[userLocation.lat, userLocation.lng]}>
+                <Popup>Vị trí của bạn</Popup>
+              </Marker>
+              <Marker position={[salonLocation.lat, salonLocation.lng]}>
+                <Popup>
+                  {salons.find((s) => s.id == selectedSalon)?.name || "Salon"}
+                </Popup>
+              </Marker>
+              {path.length > 0 && (
+                <Polyline
+                  positions={path}
+                  color="#ff7800"
+                  weight={5}
+                  opacity={0.65}
+                />
+              )}
+            </MapContainer>
+          </div>
+        )}
 
         {showInvoice && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
