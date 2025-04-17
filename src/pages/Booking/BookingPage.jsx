@@ -7,14 +7,6 @@ import "react-datepicker/dist/react-datepicker.css";
 import { vi } from "date-fns/locale";
 import QRCode from "react-qr-code";
 import Cookies from "js-cookie";
-import axios from "axios";
-import {
-  fetchCategoriesBySalon,
-  fetchServicesBySalon,
-  createBooking,
-} from "../../api/serviceoffering";
-import { getStaff } from "../../api/booking";
-import Navbar from "../../components/Navbar";
 import {
   MapContainer,
   TileLayer,
@@ -24,6 +16,14 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import axios from "axios";
+import {
+  fetchCategoriesBySalon,
+  fetchServicesBySalon,
+  createBooking,
+  fetchSalonById,
+  fetchSalons,
+} from "../../api/booking";
 
 // Fix Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -45,13 +45,11 @@ const BookingPage = () => {
 
   const [user, setUser] = useState(null);
   const [salons, setSalons] = useState([]);
-  const [staff, setStaff] = useState([]);
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
   const [allServices, setAllServices] = useState([]);
   const [selectedSalon, setSelectedSalon] = useState(salonId || "");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedStaff, setSelectedStaff] = useState("");
   const [selectedServices, setSelectedServices] = useState(() => {
     const savedServices = Cookies.get("selectedServices");
     const preSelectedIds = preSelectedServices
@@ -112,19 +110,11 @@ const BookingPage = () => {
       navigate("/login");
     }
 
-    fetch("http://localhost:8084/salon")
-      .then((res) => res.json())
+    fetchSalons()
       .then((data) => setSalons(data || []))
       .catch((err) => {
         setError(err.message);
         toast.error("Không thể tải danh sách salon: " + err.message);
-      });
-
-    getStaff()
-      .then((data) => setStaff(data || []))
-      .catch((err) => {
-        setError(err.message);
-        toast.error(err.message);
       });
   }, [navigate]);
 
@@ -164,7 +154,7 @@ const BookingPage = () => {
             limit: 1,
           },
           headers: {
-            "User-Agent": "YourAppName/1.0 (your.email@example.com)", // Thay bằng email của bạn
+            "User-Agent": "SalonBookingApp/1.0 (contact@example.com)",
           },
         }
       );
@@ -201,9 +191,7 @@ const BookingPage = () => {
             fetchCategoriesBySalon(selectedSalon),
             fetchServicesBySalon(selectedSalon, null),
             fetchServicesBySalon(selectedSalon, selectedCategory || null),
-            fetch(`http://localhost:8084/salon/${selectedSalon}`).then((res) =>
-              res.json()
-            ),
+            fetchSalonById(selectedSalon),
           ]);
 
         const validAllServices = allServicesData.filter(
@@ -300,7 +288,6 @@ const BookingPage = () => {
       customerId: user?.id || userId,
       startTime: startTime.toISOString(),
       serviceIds: selectedServices,
-      staffId: selectedStaff || null,
       paymentMethod: paymentMethod.toUpperCase().replace(" ", "_"),
     };
 
@@ -335,7 +322,7 @@ const BookingPage = () => {
     return hours >= 9 && hours < 18;
   };
 
-  // Đường đi đơn giản (đường thẳng) giữa userLocation và salonLocation
+  // Simple path (straight line) between userLocation and salonLocation
   const path =
     userLocation && salonLocation
       ? [
@@ -346,9 +333,8 @@ const BookingPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navbar />
       <ToastContainer />
-      <div className="container mx-auto px-4 py-10 mt-16">
+      <div className="container mx-auto px-4 py-10 mt-16 animate-slide-in">
         <h1 className="text-3xl font-bold text-amber-900 mb-6">Đặt Lịch Hẹn</h1>
         {error && <p className="text-red-500 mb-4">{error}</p>}
         <form
@@ -463,24 +449,6 @@ const BookingPage = () => {
 
           <div className="mb-6">
             <label className="block text-amber-900 font-medium mb-2">
-              Chọn Nhân Viên (Tùy Chọn)
-            </label>
-            <select
-              value={selectedStaff}
-              onChange={(e) => setSelectedStaff(e.target.value)}
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
-            >
-              <option value="">Không chọn</option>
-              {staff.map((staffMember) => (
-                <option key={staffMember.id} value={staffMember.id}>
-                  {staffMember.fullName || staffMember.email}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-amber-900 font-medium mb-2">
               Ngày và Giờ
             </label>
             <DatePicker
@@ -572,11 +540,6 @@ const BookingPage = () => {
                     "Đang chọn"}
                 </p>
                 <p className="text-gray-700">
-                  <strong>Nhân viên:</strong>{" "}
-                  {staff.find((s) => s.id == selectedStaff)?.fullName ||
-                    "Không chọn"}
-                </p>
-                <p className="text-gray-700">
                   <strong>Thời gian bắt đầu:</strong>{" "}
                   {startTime
                     ? startTime.toLocaleString("vi-VN", {
@@ -606,10 +569,22 @@ const BookingPage = () => {
                   selectedServiceDetails.map((s) => (
                     <li
                       key={s.id}
-                      className="flex justify-between text-gray-700"
+                      className="flex items-center gap-4 text-gray-700 mb-2"
                     >
-                      <span>{s.name}</span>
-                      <span>{(s.price || 0).toLocaleString("vi-VN")} VND</span>
+                      <img
+                        src={`http://localhost:8083/service-offering-images/${s.image}`}
+                        alt={s.name}
+                        className="w-12 h-12 object-cover rounded"
+                        onError={(e) => {
+                          e.target.src = "/placeholder-image.png";
+                        }}
+                      />
+                      <div className="flex-1">
+                        <span>{s.name}</span>
+                        <span className="block text-sm">
+                          {(s.price || 0).toLocaleString("vi-VN")} VND
+                        </span>
+                      </div>
                     </li>
                   ))
                 ) : (
@@ -635,8 +610,6 @@ const BookingPage = () => {
                   className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
                 >
                   <option value="">Chọn phương thức</option>
-                  <option value="MoMo">MoMo</option>
-                  <option value="VNPay">VNPay</option>
                   <option value="ZaloPay">ZaloPay</option>
                   <option value="MBBank">MBBank</option>
                 </select>

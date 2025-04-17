@@ -10,7 +10,9 @@ const IMAGE_BASE_URL = "http://localhost:8083/service-offering-images";
 // Fetch all salons
 export const fetchSalons = async () => {
   try {
-    const response = await axios.get(SALON_API);
+    const response = await axios.get(SALON_API, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
     return response.data;
   } catch (error) {
     console.error("Error fetching salons:", error);
@@ -21,7 +23,9 @@ export const fetchSalons = async () => {
 // Fetch categories for a specific salon
 export const fetchCategoriesBySalon = async (salonId) => {
   try {
-    const response = await axios.get(`${CATEGORY_API}/${salonId}`);
+    const response = await axios.get(`${CATEGORY_API}/${salonId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
     return response.data;
   } catch (error) {
     console.error(`Error fetching categories for salon ${salonId}:`, error);
@@ -35,7 +39,9 @@ export const fetchServicesBySalon = async (salonId, categoryId = null) => {
     const url = categoryId
       ? `${SERVICE_API}/salon/${salonId}?categoryId=${categoryId}`
       : `${SERVICE_API}/salon/${salonId}`;
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
     return response.data;
   } catch (error) {
     console.error(`Error fetching services for salon ${salonId}:`, error);
@@ -50,7 +56,10 @@ export const createBooking = async (salonId, bookingRequest) => {
       `${BOOKING_API}?salonId=${salonId}`,
       bookingRequest,
       {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       }
     );
     return response.data;
