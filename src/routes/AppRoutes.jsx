@@ -46,7 +46,6 @@ const AppRoutes = () => {
           <>
             <Navbar />
             <ServiceList />
-            <BookingPage />
             <Footer />
           </>
         }
