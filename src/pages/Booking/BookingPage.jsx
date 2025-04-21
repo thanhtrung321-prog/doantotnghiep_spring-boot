@@ -23,6 +23,8 @@ import {
   createBooking,
   fetchSalonById,
   fetchSalons,
+  createPaymentLink,
+  proceedPayment,
 } from "../../api/booking";
 
 // Fix Leaflet default marker icons
@@ -75,6 +77,13 @@ const BookingPage = () => {
   const [salonAddress, setSalonAddress] = useState("");
   const [salonLocation, setSalonLocation] = useState(null);
   const [showMap, setShowMap] = useState(false);
+  const [paymentLink, setPaymentLink] = useState(null);
+  const [salonOperatingHours, setSalonOperatingHours] = useState({
+    openingTime: "09:00",
+    closingTime: "18:00",
+  });
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showFailureModal, setShowFailureModal] = useState(false);
 
   // Calculate total price and duration
   const selectedServiceDetails = allServices.filter((s) =>
@@ -89,10 +98,17 @@ const BookingPage = () => {
     0
   );
 
-  // Estimate completion time
+  // Estimate completion time with precise minutes and seconds
   const completionTime = startTime
-    ? new Date(startTime.getTime() + totalDuration * 60000)
+    ? new Date(startTime.getTime() + totalDuration * 60 * 1000)
     : null;
+
+  // Log for debugging
+  useEffect(() => {
+    console.log("Total duration:", totalDuration, "minutes");
+    console.log("Start time:", startTime);
+    console.log("Completion time:", completionTime);
+  }, [totalDuration, startTime, completionTime]);
 
   // Update cookie when selectedServices changes
   useEffect(() => {
@@ -105,13 +121,29 @@ const BookingPage = () => {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        if (parsedUser.id) {
+          setUser(parsedUser);
+          console.log("User loaded from localStorage:", parsedUser);
+        } else {
+          toast.error("Thông tin người dùng thiếu ID. Vui lòng đăng nhập lại.");
+          navigate("/login");
+        }
+      } catch (e) {
+        toast.error("Dữ liệu người dùng không hợp lệ. Vui lòng đăng nhập lại.");
+        navigate("/login");
+      }
     } else {
+      toast.error("Vui lòng đăng nhập để tiếp tục.");
       navigate("/login");
     }
 
     fetchSalons()
-      .then((data) => setSalons(data || []))
+      .then((data) => {
+        setSalons(data || []);
+        console.log("Salons fetched:", data);
+      })
       .catch((err) => {
         setError(err.message);
         toast.error("Không thể tải danh sách salon: " + err.message);
@@ -148,11 +180,7 @@ const BookingPage = () => {
       const response = await axios.get(
         "https://nominatim.openstreetmap.org/search",
         {
-          params: {
-            q: address,
-            format: "json",
-            limit: 1,
-          },
+          params: { q: address, format: "json", limit: 1 },
           headers: {
             "User-Agent": "SalonBookingApp/1.0 (contact@example.com)",
           },
@@ -166,7 +194,10 @@ const BookingPage = () => {
       }
     } catch (err) {
       console.error("Geocoding error:", err);
-      throw err;
+      toast.warn(
+        "Không thể lấy tọa độ salon. Sử dụng tọa độ mặc định (TP.HCM)."
+      );
+      return { lat: 10.7769, lng: 106.7009 }; // Default to Ho Chi Minh City
     }
   };
 
@@ -181,6 +212,7 @@ const BookingPage = () => {
       setSalonAddress("");
       setSalonLocation(null);
       setShowMap(false);
+      setSalonOperatingHours({ openingTime: "09:00", closingTime: "18:00" });
       return;
     }
 
@@ -225,20 +257,13 @@ const BookingPage = () => {
         setCurrentService("");
         const fullAddress = `${salonData.address}, ${salonData.city}, Vietnam`;
         setSalonAddress(fullAddress);
+        setSalonOperatingHours({
+          openingTime: salonData.openingTime || "09:00",
+          closingTime: salonData.closingTime || "18:00",
+        });
 
-        // Geocode salon address
-        try {
-          const coords = await geocodeAddress(fullAddress);
-          setSalonLocation(coords);
-        } catch (err) {
-          toast.warn(
-            "Không thể lấy tọa độ salon. Sử dụng tọa độ mặc định (TP.HCM)."
-          );
-          setSalonLocation({
-            lat: 10.7769,
-            lng: 106.7009,
-          });
-        }
+        const coords = await geocodeAddress(fullAddress);
+        setSalonLocation(coords);
       } catch (err) {
         setError(err.message);
         toast.error(err.message);
@@ -272,6 +297,35 @@ const BookingPage = () => {
     if (!selectedServices.length) {
       toast.warn("Bạn chưa chọn dịch vụ, hóa đơn sẽ hiển thị 0 VND.");
     }
+
+    // Check operating hours
+    const startHour = startTime.getHours();
+    const startMinute = startTime.getMinutes();
+    const endTime = completionTime || startTime;
+    const endHour = endTime.getHours();
+    const endMinute = endTime.getMinutes();
+    const [openHour, openMinute] = salonOperatingHours.openingTime
+      .split(":")
+      .map(Number);
+    const [closeHour, closeMinute] = salonOperatingHours.closingTime
+      .split(":")
+      .map(Number);
+
+    const startTimeInMinutes = startHour * 60 + startMinute;
+    const endTimeInMinutes = endHour * 60 + endMinute;
+    const openTimeInMinutes = openHour * 60 + openMinute;
+    const closeTimeInMinutes = closeHour * 60 + closeMinute;
+
+    if (
+      startTimeInMinutes < openTimeInMinutes ||
+      endTimeInMinutes > closeTimeInMinutes
+    ) {
+      toast.error(
+        `Thời gian đặt lịch phải nằm trong giờ hoạt động của salon (${salonOperatingHours.openingTime} - ${salonOperatingHours.closingTime})`
+      );
+      return;
+    }
+
     setShowInvoice(true);
   };
 
@@ -281,48 +335,151 @@ const BookingPage = () => {
       return;
     }
 
+    if (!user || !user.id) {
+      toast.error("Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.");
+      navigate("/login");
+      return;
+    }
+
+    if (!selectedSalon) {
+      toast.error("Vui lòng chọn salon");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     const bookingRequest = {
-      customerId: user?.id || userId,
       startTime: startTime.toISOString(),
-      serviceIds: selectedServices,
-      paymentMethod: paymentMethod.toUpperCase().replace(" ", "_"),
+      serviceIds: selectedServices.map((id) => parseInt(id)),
+    };
+
+    const userData = {
+      id: user.id,
+      fullname: user.fullname || "Unknown",
+      email: user.email || "unknown@example.com",
     };
 
     try {
-      const booking = await createBooking(selectedSalon, bookingRequest);
-      setBookingStatus("CHỜ XỬ LÝ");
-      setShowQR(true);
+      console.log(
+        "Calling createBooking with salonId:",
+        selectedSalon,
+        "customerId:",
+        user.id,
+        "and bookingRequest:",
+        bookingRequest
+      );
+      const bookingResponse = await createBooking(
+        selectedSalon,
+        user.id,
+        bookingRequest
+      );
+      const booking = {
+        id: bookingResponse.id,
+        totalPrice: totalPrice,
+        salonId: parseInt(selectedSalon),
+        customerId: user.id,
+        startTime: bookingRequest.startTime,
+        endTime: completionTime ? completionTime.toISOString() : null,
+        status: "PENDING",
+        serviceIds: bookingRequest.serviceIds,
+      };
 
-      setTimeout(() => {
-        const isSuccess = Math.random() > 0.2;
-        setBookingStatus(isSuccess ? "THÀNH CÔNG" : "THẤT BẠI");
-        if (isSuccess) {
-          Cookies.remove("selectedServices");
-          navigate("/booking", { state: { booking } });
-        } else {
-          setError("Đặt lịch thất bại. Vui lòng thử lại.");
-        }
-      }, 2000);
+      console.log(
+        "Sending payment request with user:",
+        userData,
+        "booking:",
+        booking,
+        "paymentMethod:",
+        paymentMethod
+      );
+      const paymentResponse = await createPaymentLink(
+        userData,
+        booking,
+        paymentMethod.toUpperCase()
+      );
+
+      setPaymentLink(paymentResponse);
+      setBookingStatus("CHỜ XỬ LÝ");
+
+      if (
+        paymentMethod.toUpperCase() === "VNPAY" &&
+        paymentResponse.paymentLinkUrl
+      ) {
+        setShowQR(true);
+        setTimeout(async () => {
+          window.location.href = paymentResponse.paymentLinkUrl;
+          // Wait for VNPAY callback (handled by backend, assuming redirect back)
+          try {
+            const paymentSuccess = await proceedPayment(
+              paymentResponse.paymentLinkId,
+              paymentResponse.paymentLinkId
+            );
+            if (paymentSuccess) {
+              setBookingStatus("THÀNH CÔNG");
+              setSelectedServices([]);
+              Cookies.remove("selectedServices");
+              setShowSuccessModal(true);
+            } else {
+              setBookingStatus("THẤT BẠI");
+              setError("Thanh toán VNPAY không thành công.");
+              setShowFailureModal(true);
+            }
+          } catch (err) {
+            setError("Thanh toán VNPAY không thành công: " + err.message);
+            setBookingStatus("THẤT BẠI");
+            setShowFailureModal(true);
+          }
+        }, 5000);
+      } else if (paymentMethod.toUpperCase() === "CASH") {
+        // CASH: No need to call proceedPayment, assume success
+        setBookingStatus("THÀNH CÔNG");
+        setSelectedServices([]);
+        Cookies.remove("selectedServices");
+        setShowSuccessModal(true);
+      }
     } catch (err) {
-      setError(err.message);
+      setError("Đặt lịch không thành công: " + err.message);
+      setBookingStatus("THẤT BẠI");
+      setShowFailureModal(true);
+    } finally {
       setLoading(false);
-      toast.error(err.message);
     }
   };
 
-  const qrCodeValue = `Payment for booking: ${selectedServices.join(
-    ","
-  )} at salon ${selectedSalon} via ${paymentMethod}`;
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    navigate("/booking");
+  };
+
+  const handleCloseFailureModal = () => {
+    setShowFailureModal(false);
+  };
+
+  const qrCodeValue =
+    paymentLink?.paymentLinkUrl ||
+    `Payment for booking at salon ${selectedSalon} via ${paymentMethod}`;
 
   const filterTime = (time) => {
     const hours = time.getHours();
-    return hours >= 9 && hours < 18;
+    const [openHour] = salonOperatingHours.openingTime.split(":").map(Number);
+    const [closeHour] = salonOperatingHours.closingTime.split(":").map(Number);
+    return hours >= openHour && hours < closeHour;
   };
 
-  // Simple path (straight line) between userLocation and salonLocation
+  const formatDateTime = (date) => {
+    if (!date) return "Chưa chọn";
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  };
+
   const path =
     userLocation && salonLocation
       ? [
@@ -336,7 +493,9 @@ const BookingPage = () => {
       <ToastContainer />
       <div className="container mx-auto px-4 py-10 mt-16 animate-slide-in">
         <h1 className="text-3xl font-bold text-amber-900 mb-6">Đặt Lịch Hẹn</h1>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {error && !showFailureModal && (
+          <p className="text-red-500 mb-4">{error}</p>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -478,7 +637,6 @@ const BookingPage = () => {
           </button>
         </form>
 
-        {/* Button to Show Directions */}
         {selectedSalon && (
           <div className="mt-6 text-center">
             <button
@@ -490,7 +648,6 @@ const BookingPage = () => {
           </div>
         )}
 
-        {/* React-Leaflet Map Section */}
         {showMap && selectedSalon && userLocation && salonLocation && (
           <div className="mt-8">
             <h2 className="text-2xl font-bold text-amber-900 mb-4">
@@ -541,21 +698,11 @@ const BookingPage = () => {
                 </p>
                 <p className="text-gray-700">
                   <strong>Thời gian bắt đầu:</strong>{" "}
-                  {startTime
-                    ? startTime.toLocaleString("vi-VN", {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })
-                    : "Chưa chọn"}
+                  {formatDateTime(startTime)}
                 </p>
                 <p className="text-gray-700">
                   <strong>Thời gian hoàn thành:</strong>{" "}
-                  {completionTime
-                    ? completionTime.toLocaleString("vi-VN", {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })
-                    : "Không có dịch vụ"}
+                  {formatDateTime(completionTime)}
                 </p>
               </div>
               <h3 className="text-lg font-semibold text-amber-900 mb-2">
@@ -610,19 +757,21 @@ const BookingPage = () => {
                   className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
                 >
                   <option value="">Chọn phương thức</option>
-                  <option value="ZaloPay">ZaloPay</option>
-                  <option value="MBBank">MBBank</option>
+                  <option value="VNPAY">VNPay</option>
+                  <option value="CASH">Tiền mặt</option>
                 </select>
               </div>
 
-              {showQR && paymentMethod && (
-                <div className="mt-4 text-center">
-                  <p className="text-gray-700 mb-2">
-                    Quét mã QR để thanh toán qua {paymentMethod}
-                  </p>
-                  <QRCode value={qrCodeValue} size={150} />
-                </div>
-              )}
+              {showQR &&
+                paymentMethod &&
+                paymentMethod.toUpperCase() === "VNPAY" && (
+                  <div className="mt-4 text-center">
+                    <p className="text-gray-700 mb-2">
+                      Quét mã QR để thanh toán qua VNPay
+                    </p>
+                    <QRCode value={qrCodeValue} size={150} />
+                  </div>
+                )}
 
               <div className="mt-6 flex justify-end gap-4">
                 <button
@@ -647,17 +796,43 @@ const BookingPage = () => {
           </div>
         )}
 
-        {bookingStatus !== "CHỜ XỬ LÝ" && !showInvoice && (
-          <div className="mt-6 text-center">
-            <p
-              className={`text-lg ${
-                bookingStatus === "THÀNH CÔNG"
-                  ? "text-green-600"
-                  : "text-red-600"
-              }`}
-            >
-              Đặt lịch {bookingStatus.toLowerCase()}!
-            </p>
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center">
+              <h2 className="text-2xl font-bold text-green-600 mb-4">
+                Đặt Lịch Thành Công
+              </h2>
+              <p className="text-gray-700 mb-4">
+                Lịch hẹn của bạn tại{" "}
+                {salons.find((s) => s.id == selectedSalon)?.name || "salon"} đã
+                được xác nhận.
+              </p>
+              <button
+                onClick={handleCloseSuccessModal}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showFailureModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center">
+              <h2 className="text-2xl font-bold text-red-600 mb-4">
+                Đặt Lịch Thất Bại
+              </h2>
+              <p className="text-gray-700 mb-4">
+                {error || "Đã xảy ra lỗi khi đặt lịch. Vui lòng thử lại."}
+              </p>
+              <button
+                onClick={handleCloseFailureModal}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+              >
+                OK
+              </button>
+            </div>
           </div>
         )}
       </div>
