@@ -358,6 +358,16 @@ const Services = () => {
     },
   };
 
+  // Handle navigation in step-by-step mode
+  const handleStepNavigation = (currentIndex, direction) => {
+    const service = services.find((s) => s.id === showDetails.id);
+    const steps = parseSteps(service).slice(1); // displaySteps
+    const newIndex = direction === "next" ? currentIndex + 1 : currentIndex - 1;
+    if (newIndex >= 0 && newIndex < steps.length) {
+      setShowDetails((prev) => ({ ...prev, activeIndex: newIndex }));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <ToastContainer />
@@ -485,12 +495,15 @@ const Services = () => {
                     </div>
                   </div>
 
-                  <div className="p-5">
-                    <h3 className="text-xl font-bold mb-2">{firstStep.name}</h3>
-                    <p className="text-gray-400 mb-4">
-                      {firstStep.description}
-                    </p>
-
+                  <div className="p-5 flex flex-col h-[260px]">
+                    <div className="min-h-[120px]">
+                      <h3 className="text-xl font-bold mb-2">
+                        {firstStep.name}
+                      </h3>
+                      <p className="text-gray-400 mb-4 line-clamp-3">
+                        {firstStep.description}
+                      </p>
+                    </div>
                     <div className="flex justify-between items-center text-sm text-gray-400 mb-4">
                       <div className="flex items-center">
                         <svg
@@ -509,8 +522,7 @@ const Services = () => {
                       </div>
                       <div>ID: {service.id}</div>
                     </div>
-
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 mt-auto">
                       <button
                         className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg transition-colors duration-300"
                         onClick={() => handleEdit(service)}
@@ -702,26 +714,48 @@ const Services = () => {
                   );
                 }
               } else {
-                // Step-by-step mode: horizontal layout with smaller image
+                // Step-by-step mode: horizontal layout with consistent button positioning
                 return (
                   <div>
                     {displaySteps.map((step, index) => (
-                      <div
-                        key={index}
-                        className="mb-8 flex flex-row items-start"
-                      >
-                        <img
-                          src={getImageUrl(step.image)}
-                          alt={step.name}
-                          className="w-48 h-48 object-cover rounded-lg border-2 border-cyan-300 shadow-lg mr-6 transition-transform duration-300 hover:scale-105"
-                        />
-                        <div>
-                          <h3 className="text-3xl font-extrabold bg-gradient-to-r from-cyan-400 to-pink-500 text-transparent bg-clip-text mb-2">
-                            Bước {index + 1}: {step.name || "Không có tên"}
-                          </h3>
-                          <p className="text-base text-gray-100 italic mt-2">
-                            {step.description || "Không có mô tả"}
-                          </p>
+                      <div key={index} className="mb-8 flex flex-col">
+                        <div className="flex flex-row items-start">
+                          <img
+                            src={getImageUrl(step.image)}
+                            alt={step.name}
+                            className="w-48 h-48 object-cover rounded-lg border-2 border-cyan-300 shadow-lg mr-6 transition-transform duration-300 hover:scale-105"
+                          />
+                          <div className="min-h-[256px] flex flex-col">
+                            <h3 className="text-3xl font-extrabold bg-gradient-to-r from-cyan-400 to-pink-500 text-transparent bg-clip-text mb-2">
+                              Bước {index + 1}: {step.name || "Không có tên"}
+                            </h3>
+                            <p className="text-base text-gray-100 italic mt-2">
+                              {step.description || "Không có mô tả"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex justify-between mt-4">
+                          {index > 0 && (
+                            <button
+                              className="px-4 py-2 bg-gray-700 text-gray-300 hover:bg-gray-600 rounded-lg font-semibold transition-all duration-300"
+                              onClick={() =>
+                                handleStepNavigation(index, "prev")
+                              }
+                            >
+                              Trước
+                            </button>
+                          )}
+                          <div className="flex-1"></div>
+                          {index < displaySteps.length - 1 && (
+                            <button
+                              className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-pink-500 text-white hover:from-cyan-600 hover:to-pink-600 rounded-lg font-semibold transition-all duration-300"
+                              onClick={() =>
+                                handleStepNavigation(index, "next")
+                              }
+                            >
+                              Tiếp
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -912,6 +946,7 @@ const Services = () => {
                 <button
                   type="submit"
                   className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg transition-colors duration-300"
+                  disabled={isLoading}
                 >
                   {isEditing ? "Cập nhật" : "Tạo mới"}
                 </button>
