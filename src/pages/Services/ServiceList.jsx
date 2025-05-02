@@ -1,61 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import Cookies from "js-cookie";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import * as THREE from "three";
+import {
+  fetchSalons,
+  fetchCategoriesBySalon,
+  fetchServicesBySalon,
+  getImageUrl,
+} from "../../api/serviceoffering"; // Import các hàm từ api.js
 
 // API Service Functions
-const fetchSalons = async () => {
-  try {
-    const response = await axios.get("http://localhost:8084/salon", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
-    return response.data;
-  } catch (error) {
-    toast.error("Không thể tải danh sách salon: " + error.message);
-    throw error;
-  }
-};
-
-const fetchCategoriesBySalon = async (salonId) => {
-  try {
-    const response = await axios.get(
-      `http://localhost:8086/categories/salon/${salonId}`,
-      {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    toast.error("Không thể tải danh mục: " + error.message);
-    throw error;
-  }
-};
-
-const fetchServicesByCategory = async (salonId, categoryId) => {
-  try {
-    const response = await axios.get(
-      `http://localhost:8083/service-offering/salon/${salonId}?categoryId=${categoryId}`,
-      {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    toast.error("Không thể tải dịch vụ: " + error.message);
-    throw error;
-  }
-};
-
 const selectServiceAndRedirect = async (service, navigate, salonId) => {
   try {
     const user = JSON.parse(localStorage.getItem("user"));
     if (!user) throw new Error("User not logged in");
 
-    // Store selected service in cookies
-    const selectedServices = [service.id.toString()];
+    // Store selected service in cookies using originalId
+    const selectedServices = [service.originalId.toString()];
     Cookies.set("selectedServices", JSON.stringify(selectedServices), {
       expires: 1,
     });
@@ -139,7 +102,7 @@ const ServiceList = () => {
   useEffect(() => {
     fetchSalons()
       .then((data) => setSalons(data || []))
-      .catch(() => {});
+      .catch(() => toast.error("Không thể tải danh sách salon"));
   }, []);
 
   // Fetch categories when salon is selected
@@ -158,7 +121,7 @@ const ServiceList = () => {
             setServices([]);
           }
         })
-        .catch(() => {});
+        .catch(() => toast.error("Không thể tải danh mục"));
     } else {
       setCategories([]);
       setSelectedCategory(null);
@@ -168,8 +131,8 @@ const ServiceList = () => {
 
   // Fetch services when category is selected
   useEffect(() => {
-    if (selectedCategory && selectedSalon) {
-      fetchServicesByCategory(selectedSalon, selectedCategory.id)
+    if (selectedSalon && selectedCategory) {
+      fetchServicesBySalon(selectedSalon, selectedCategory.id)
         .then((data) => {
           if (data.length === 0) {
             toast.warn("Danh mục này hiện không có dịch vụ nào.");
@@ -178,7 +141,7 @@ const ServiceList = () => {
             setServices(data);
           }
         })
-        .catch(() => {});
+        .catch(() => toast.error("Không thể tải dịch vụ"));
     } else {
       setServices([]);
     }
@@ -253,11 +216,11 @@ const ServiceList = () => {
                 }`}
               >
                 <img
-                  src={`http://localhost:8086/category-images/${category.image}`}
+                  src={getImageUrl(category.image)} // Sử dụng getImageUrl
                   alt={category.name}
                   className="w-32 h-32 object-cover rounded-lg mb-2"
                   onError={(e) => {
-                    e.target.src = "/placeholder-image.png"; // Fallback image
+                    e.target.src = "/api/placeholder/300/200"; // Fallback image
                   }}
                 />
                 <span className="text-lg font-semibold">{category.name}</span>
@@ -268,14 +231,17 @@ const ServiceList = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {services.map((service) => (
             <div
-              key={service.id}
+              key={service.id} // Sử dụng ID duy nhất
               onClick={(e) => handleCardClick(e, service)}
-              className="relative bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer overflow-hidden"
+              className="relative bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer overflow-hidden group"
             >
               <img
-                src={`http://localhost:8083/service-offering-images/${service.image}`}
+                src={getImageUrl(service.image)} // Sử dụng getImageUrl
                 alt={service.name}
                 className="w-full h-48 object-cover rounded-lg mb-4 transition-transform duration-300 group-hover:scale-110"
+                onError={(e) => {
+                  e.target.src = "/api/placeholder/300/200"; // Fallback image
+                }}
               />
               <h4 className="text-xl font-semibold text-amber-800 mb-2">
                 {service.name}

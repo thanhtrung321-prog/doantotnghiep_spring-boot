@@ -27,10 +27,9 @@ const Services = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentService, setCurrentService] = useState(null);
   const [showDetails, setShowDetails] = useState(null);
-  const [displayMode, setDisplayMode] = useState("slider"); // 'slider' or 'steps'
+  const [displayMode, setDisplayMode] = useState("slider");
   const threeContainer = useRef(null);
 
-  // Form state for creating/updating services
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -41,7 +40,6 @@ const Services = () => {
     steps: [{ name: "", description: "", image: "", preview: null }],
   });
 
-  // Fetch salons on mount
   useEffect(() => {
     const loadSalons = async () => {
       try {
@@ -54,7 +52,6 @@ const Services = () => {
     loadSalons();
   }, []);
 
-  // Fetch categories and services when salon changes
   useEffect(() => {
     if (!selectedSalon) {
       setCategories([]);
@@ -81,7 +78,6 @@ const Services = () => {
     loadData();
   }, [selectedSalon]);
 
-  // Initialize Three.js scene
   useEffect(() => {
     if (!threeContainer.current) return;
 
@@ -167,7 +163,6 @@ const Services = () => {
     };
   }, []);
 
-  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -183,14 +178,12 @@ const Services = () => {
     }
   };
 
-  // Handle step input changes
   const handleStepChange = (index, field, value) => {
     const newSteps = [...formData.steps];
     newSteps[index] = { ...newSteps[index], [field]: value };
     setFormData({ ...formData, steps: newSteps });
   };
 
-  // Handle image file selection for steps with preview
   const handleImageChange = (index, e) => {
     const file = e.target.files[0];
     if (file) {
@@ -204,7 +197,6 @@ const Services = () => {
     }
   };
 
-  // Add new step
   const addStep = () => {
     setFormData({
       ...formData,
@@ -215,7 +207,6 @@ const Services = () => {
     });
   };
 
-  // Remove step
   const removeStep = (index) => {
     if (formData.steps.length === 1) {
       toast.error("Phải có ít nhất một bước!");
@@ -225,7 +216,6 @@ const Services = () => {
     setFormData({ ...formData, steps: newSteps });
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -260,7 +250,6 @@ const Services = () => {
     }
   };
 
-  // Handle edit button click
   const handleEdit = (service) => {
     setIsEditing(true);
     setCurrentService(service);
@@ -288,7 +277,6 @@ const Services = () => {
     setShowModal(true);
   };
 
-  // Handle delete button click
   const handleDelete = async (id) => {
     if (window.confirm("Bạn có chắc muốn xóa dịch vụ này không?")) {
       try {
@@ -301,7 +289,6 @@ const Services = () => {
     }
   };
 
-  // Reset form
   const resetForm = () => {
     setFormData({
       name: "",
@@ -316,7 +303,6 @@ const Services = () => {
     setCurrentService(null);
   };
 
-  // Filter services
   const filteredServices = services.filter((service) => {
     const matchesCategory =
       !selectedCategory || service.categoryId === parseInt(selectedCategory);
@@ -326,13 +312,11 @@ const Services = () => {
     return matchesCategory && matchesSearch;
   });
 
-  // Get category name by ID
   const getCategoryName = (categoryId) => {
     const category = categories.find((cat) => cat.id === categoryId);
     return category ? category.name : "Không xác định";
   };
 
-  // Parse service steps
   const parseSteps = (service) => {
     const names = service.name.split("|");
     const descriptions = service.description.split("|");
@@ -344,7 +328,6 @@ const Services = () => {
     }));
   };
 
-  // Slider settings for multiple images
   const sliderSettings = {
     dots: true,
     infinite: true,
@@ -352,16 +335,15 @@ const Services = () => {
     slidesToShow: 1,
     slidesToScroll: 1,
     autoplay: true,
-    autoplaySpeed: 10000, // 10 seconds
+    autoplaySpeed: 10000,
     afterChange: (index) => {
       setShowDetails((prev) => ({ ...prev, activeIndex: index }));
     },
   };
 
-  // Handle navigation in step-by-step mode
   const handleStepNavigation = (currentIndex, direction) => {
     const service = services.find((s) => s.id === showDetails.id);
-    const steps = parseSteps(service).slice(1); // displaySteps
+    const steps = parseSteps(service).slice(1);
     const newIndex = direction === "next" ? currentIndex + 1 : currentIndex - 1;
     if (newIndex >= 0 && newIndex < steps.length) {
       setShowDetails((prev) => ({ ...prev, activeIndex: newIndex }));
@@ -371,10 +353,6 @@ const Services = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <ToastContainer />
-      <div
-        ref={threeContainer}
-        className="absolute top-0 left-0 w-full h-48 z-0"
-      />
       <header className="relative z-10 bg-gradient-to-b from-gray-900 to-transparent pt-8 pb-16">
         <div className="container mx-auto px-4">
           <h1 className="text-4xl font-bold text-center mb-2">
@@ -464,6 +442,10 @@ const Services = () => {
           </div>
         </div>
       </header>
+
+      <div className="w-full h-0.5 bg-gray-900 flex justify-center items-center">
+        <div ref={threeContainer} className="w-full h-full" />
+      </div>
 
       <main className="container mx-auto px-4 relative z-10 -mt-8">
         {isLoading ? (
@@ -576,7 +558,6 @@ const Services = () => {
         )}
       </main>
 
-      {/* Details Modal */}
       {showDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
           <div className="bg-gradient-to-b from-gray-900 to-gray-800 rounded-2xl p-10 w-full max-w-[80%] max-h-[90vh] overflow-y-auto shadow-2xl border-2 border-cyan-400 relative">
@@ -639,9 +620,8 @@ const Services = () => {
             {(() => {
               const service = services.find((s) => s.id === showDetails.id);
               const steps = parseSteps(service);
-              const displaySteps = steps.slice(1); // Start from second step
+              const displaySteps = steps.slice(1);
               if (steps.length <= 1) {
-                // Single image case
                 const step = steps[0];
                 return (
                   <div className="flex flex-col items-center">
@@ -661,9 +641,7 @@ const Services = () => {
                   </div>
                 );
               } else if (displayMode === "slider") {
-                // Slider mode: single image in slider
                 if (displaySteps.length === 1) {
-                  // Only one step after first, display statically
                   const step = displaySteps[0];
                   return (
                     <div className="flex flex-col items-center">
@@ -683,7 +661,6 @@ const Services = () => {
                     </div>
                   );
                 } else {
-                  // Multiple steps, use slider
                   return (
                     <div className="flex flex-col items-center">
                       <div className="w-[80%]">
@@ -714,7 +691,6 @@ const Services = () => {
                   );
                 }
               } else {
-                // Step-by-step mode: horizontal layout with consistent button positioning
                 return (
                   <div>
                     {displaySteps.map((step, index) => (
@@ -773,7 +749,6 @@ const Services = () => {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-gray-800 rounded-xl p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
