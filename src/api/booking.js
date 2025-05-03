@@ -72,17 +72,76 @@ export const fetchServicesBySalon = async (salonId, categoryId = null) => {
 };
 
 /**
- * Creates a booking for a salon with the specified customer.
+ * Fetches details of a specific service.
+ * @param {number} serviceId - The ID of the service.
+ * @returns {Promise<object>} The service object with detailed information.
+ * @throws {Error} If the request fails.
+ */
+export const fetchServiceById = async (serviceId) => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}:8083/service-offering/${serviceId}`,
+      {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    const errorMessage = error.response
+      ? `Lỗi từ server: ${error.response.status} - ${
+          error.response.data.message || error.message
+        }`
+      : `Không thể kết nối đến dịch vụ chi tiết: ${error.message}`;
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
+/**
+ * Fetches available time slots for a salon on a specific date.
+ * @param {number} salonId - The ID of the salon.
+ * @param {string} date - The date in YYYY-MM-DD format.
+ * @returns {Promise<object[]>} Array of available slot objects.
+ * @throws {Error} If the request fails.
+ */
+export const fetchAvailableSlots = async (salonId, date) => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}:8087/booking/slot/salon/${salonId}/date/${date}`,
+      {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    const errorMessage = error.response
+      ? `Lỗi từ server: ${error.response.status} - ${
+          error.response.data.message || error.message
+        }`
+      : `Không thể kết nối đến dịch vụ lịch trống: ${error.message}`;
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+};
+
+/**
+ * Creates a booking for a salon with the specified customer and staff.
  * @param {number} salonId - The ID of the salon.
  * @param {number} customerId - The ID of the customer (user).
+ * @param {string} staffId - The ID of the staff member.
  * @param {object} bookingRequest - The booking request object containing startTime and serviceIds.
  * @returns {Promise<object>} The created booking object.
  * @throws {Error} If the request fails.
  */
-export const createBooking = async (salonId, customerId, bookingRequest) => {
+export const createBooking = async (
+  salonId,
+  customerId,
+  staffId,
+  bookingRequest
+) => {
   try {
-    if (!salonId || !customerId) {
-      throw new Error("salonId và customerId là bắt buộc");
+    if (!salonId || !customerId || !staffId) {
+      throw new Error("salonId, customerId, và staffId là bắt buộc");
     }
     if (!bookingRequest?.startTime || !bookingRequest?.serviceIds?.length) {
       throw new Error("startTime và serviceIds là bắt buộc");
@@ -93,15 +152,17 @@ export const createBooking = async (salonId, customerId, bookingRequest) => {
       serviceIds: bookingRequest.serviceIds,
     };
 
-    console.log("Sending booking request to :8087/booking:", {
+    console.log("Sending booking request to :8080/booking:", {
       salonId,
       customerId,
+      staffId,
       cleanedBookingRequest,
     });
     const response = await axios.post(
-      `${API_BASE_URL}:8087/booking?salonId=${salonId}&customerId=${customerId}`,
+      `${API_BASE_URL}:8080/booking`,
       cleanedBookingRequest,
       {
+        params: { salonId, customerId, staffId },
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
@@ -130,7 +191,9 @@ export const createBooking = async (salonId, customerId, bookingRequest) => {
  */
 export const fetchSalonById = async (salonId) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}:8084/salon/${salonId}`);
+    const response = await axios.get(`${API_BASE_URL}:8084/salon/${salonId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
     return response.data;
   } catch (error) {
     const errorMessage = error.response
@@ -150,7 +213,9 @@ export const fetchSalonById = async (salonId) => {
  */
 export const fetchSalons = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}:8084/salon`);
+    const response = await axios.get(`${API_BASE_URL}:8084/salon`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
     return response.data;
   } catch (error) {
     const errorMessage = error.response
@@ -187,6 +252,7 @@ export const createPaymentLink = async (user, booking, paymentMethod) => {
       endTime: booking.endTime,
       status: booking.status,
       serviceIds: booking.serviceIds,
+      staffId: booking.staffId,
     };
 
     const response = await axios.post(
