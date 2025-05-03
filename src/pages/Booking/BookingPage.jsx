@@ -93,6 +93,7 @@ const BookingPage = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [showServiceDetails, setShowServiceDetails] = useState(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Calculate total price and duration
   const selectedServiceDetails = allServices.filter((s) =>
@@ -796,26 +797,101 @@ const BookingPage = () => {
                   Chọn Dịch Vụ
                 </label>
                 <div className="flex items-center gap-3">
-                  <select
-                    value={currentService}
-                    onChange={(e) => setCurrentService(e.target.value)}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 transition-all"
-                    disabled={!services.length}
-                    aria-label="Chọn dịch vụ"
-                  >
-                    <option value="">Chọn dịch vụ</option>
-                    {services
-                      .filter(
-                        (srv) => !selectedServices.includes(srv.id.toString())
-                      )
-                      .map((srv) => (
-                        <option key={srv.id} value={srv.id.toString()}>
-                          {srv.name.split("|")[0]} -{" "}
-                          {(srv.price || 0).toLocaleString("vi-VN")} VND (
-                          {srv.duration || 0} phút)
-                        </option>
-                      ))}
-                  </select>
+                  <div className="relative flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 bg-white text-left flex items-center justify-between transition-all"
+                      aria-expanded={isDropdownOpen}
+                      aria-controls="service-dropdown"
+                      disabled={!services.length}
+                    >
+                      <span>
+                        {currentService
+                          ? services
+                              .find(
+                                (srv) => srv.id.toString() === currentService
+                              )
+                              ?.name.split("|")[0] || "Chọn dịch vụ"
+                          : "Chọn dịch vụ"}
+                      </span>
+                      <svg
+                        className={`w-5 h-5 transform transition-transform ${
+                          isDropdownOpen ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                    {isDropdownOpen && (
+                      <ul
+                        id="service-dropdown"
+                        className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        role="listbox"
+                      >
+                        {services
+                          .filter(
+                            (srv) =>
+                              !selectedServices.includes(srv.id.toString())
+                          )
+                          .map((srv) => (
+                            <li
+                              key={srv.id}
+                              onClick={() => {
+                                setCurrentService(srv.id.toString());
+                                setIsDropdownOpen(false);
+                              }}
+                              className="flex items-center gap-3 p-3 hover:bg-gray-100 cursor-pointer transition-all"
+                              role="option"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  setCurrentService(srv.id.toString());
+                                  setIsDropdownOpen(false);
+                                }
+                              }}
+                            >
+                              <img
+                                src={
+                                  srv.image
+                                    ? `http://localhost:8083/service-offering-images/${
+                                        srv.image.split("|")[0]
+                                      }`
+                                    : "/placeholder-image.png"
+                                }
+                                alt={srv.name.split("|")[0]}
+                                className="w-6 h-6 object-cover rounded"
+                                onError={(e) => {
+                                  e.target.src = "/placeholder-image.png";
+                                }}
+                              />
+                              <div className="flex-1">
+                                <span>{srv.name.split("|")[0]}</span>
+                                <span className="block text-sm text-gray-600">
+                                  {(srv.price || 0).toLocaleString("vi-VN")} VND
+                                  ({srv.duration || 0} phút)
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        {services.filter(
+                          (srv) => !selectedServices.includes(srv.id.toString())
+                        ).length === 0 && (
+                          <li className="p-3 text-gray-500">
+                            Không có dịch vụ nào
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={handleAddService}
@@ -1056,30 +1132,42 @@ const BookingPage = () => {
               </h3>
               <ul className="mb-6 space-y-4 max-w-full">
                 {selectedServiceDetails.length > 0 ? (
-                  selectedServiceDetails.map((s) => (
+                  selectedServiceDetails.map((srv) => (
                     <li
-                      key={s.id}
+                      key={srv.id}
                       className="flex items-center gap-6 text-gray-700 py-3"
                     >
                       <img
                         src={
-                          s.image
+                          srv.image
                             ? `http://localhost:8083/service-offering-images/${
-                                s.image.split("|")[0]
+                                srv.image.split("|")[0]
                               }`
                             : "/placeholder-image.png"
                         }
-                        alt={s.name.split("|")[0]}
+                        alt={srv.name.split("|")[0]}
                         className="w-16 h-16 object-cover rounded-lg"
                         onError={(e) => {
                           e.target.src = "/placeholder-image.png";
                         }}
                       />
                       <div className="flex-1">
-                        <span>{s.name.split("|")[0]}</span>
+                        <span>{srv.name.split("|")[0]}</span>
                         <span className="block text-sm">
-                          {(s.price || 0).toLocaleString("vi-VN")} VND
+                          {(srv.price || 0).toLocaleString("vi-VN")} VND
                         </span>
+                      </div>
+                      <div className="flex gap-4">
+                        <button
+                          type="button"
+                          onClick={() => handleServiceClick(srv.id)}
+                          className="px-4 py-1 border border-amber-600 text-amber-600 font-semibold rounded-md hover:bg-amber-600 hover:text-white transition duration-200 cursor-pointer"
+                          aria-label={`Xem chi tiết dịch vụ ${
+                            srv.name.split("|")[0]
+                          }`}
+                        >
+                          Xem chi tiết
+                        </button>
                       </div>
                     </li>
                   ))
@@ -1333,7 +1421,7 @@ const BookingPage = () => {
 
         {showFailureModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full text-center animate-fade-in">
+            <div className="bg-white p-8 rounded-xl shadow-2KILL max-w-md w-full text-center animate-fade-in">
               <h2 className="text-3xl font-bold text-red-600 mb-4">
                 Đặt Lịch Thất Bại
               </h2>
