@@ -6,17 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { vi } from "date-fns/locale";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import QRCode from "react-qr-code";
 import Cookies from "js-cookie";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  Polyline,
-} from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import axios from "axios";
 import {
   fetchCategoriesBySalon,
@@ -30,23 +20,10 @@ import {
   fetchAvailableSlots,
 } from "../../api/booking";
 
-// Fix Leaflet default marker icons
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
-
 const BookingPage = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const {
-    userId,
-    salonId,
-    services: preSelectedServices,
-  } = location.state || {};
+  const { state } = useLocation();
+  const { userId, salonId, services: preSelected } = state || {};
 
   const [user, setUser] = useState(null);
   const [salons, setSalons] = useState([]);
@@ -54,477 +31,322 @@ const BookingPage = () => {
   const [services, setServices] = useState([]);
   const [allServices, setAllServices] = useState([]);
   const [staffList, setStaffList] = useState([]);
-  const [selectedSalon, setSelectedSalon] = useState(salonId || "");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [salon, setSalon] = useState(salonId || "");
+  const [category, setCategory] = useState("");
   const [selectedServices, setSelectedServices] = useState(() => {
-    const savedServices = Cookies.get("selectedServices");
-    const preSelectedIds = preSelectedServices
-      ? preSelectedServices
+    const saved = Cookies.get("selectedServices");
+    const preIds = preSelected
+      ? preSelected
           .filter(
             (s) => s.id && s.name && s.price != null && s.duration != null
           )
           .map((s) => s.id.toString())
       : [];
-    return savedServices
-      ? [...new Set([...JSON.parse(savedServices), ...preSelectedIds])]
-      : preSelectedIds;
+    return saved ? [...new Set([...JSON.parse(saved), ...preIds])] : preIds;
   });
   const [currentService, setCurrentService] = useState("");
-  const [selectedStaff, setSelectedStaff] = useState("");
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [staff, setStaff] = useState("");
+  const [date, setDate] = useState(null);
   const [startTime, setStartTime] = useState(null);
-  const [availableSlots, setAvailableSlots] = useState([]);
+  const [slots, setSlots] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("");
-  const [bookingStatus, setBookingStatus] = useState("CHỜ XỬ LÝ");
+  const [status, setStatus] = useState("CHỜ XỬ LÝ");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [showBill, setShowBill] = useState(false);
-  const [showQR, setShowQR] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
-  const [salonAddress, setSalonAddress] = useState("");
-  const [salonLocation, setSalonLocation] = useState(null);
-  const [showMap, setShowMap] = useState(false);
+  const [address, setAddress] = useState("");
   const [paymentLink, setPaymentLink] = useState(null);
-  const [salonOperatingHours, setSalonOperatingHours] = useState({
-    openingTime: "09:00",
-    closingTime: "18:00",
-  });
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showFailureModal, setShowFailureModal] = useState(false);
-  const [showServiceDetails, setShowServiceDetails] = useState(null);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hours, setHours] = useState({ open: "09:00", close: "18:00" });
+  const [successModal, setSuccessModal] = useState(false);
+  const [failureModal, setFailureModal] = useState(false);
+  const [serviceDetails, setServiceDetails] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Calculate total price and duration
-  const selectedServiceDetails = allServices.filter((s) =>
+  const selectedDetails = allServices.filter((s) =>
     selectedServices.includes(s.id.toString())
   );
-  const totalPrice = selectedServiceDetails.reduce(
+  const totalPrice = selectedDetails.reduce(
     (sum, s) => sum + (s.price || 0),
     0
   );
-  const totalDuration = selectedServiceDetails.reduce(
+  const totalDuration = selectedDetails.reduce(
     (sum, s) => sum + (s.duration || 0),
     0
   );
+  const endTime =
+    startTime && totalDuration > 0
+      ? new Date(startTime.getTime() + totalDuration * 60 * 1000)
+      : null;
 
-  // Estimate completion time
-  const completionTime = startTime
-    ? new Date(startTime.getTime() + totalDuration * 60 * 1000)
-    : null;
-
-  // Update cookie when selectedServices changes
   useEffect(() => {
     Cookies.set("selectedServices", JSON.stringify(selectedServices), {
       expires: 1,
     });
   }, [selectedServices]);
 
-  // Fetch user data, salons, and staff
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        if (parsedUser.id) {
-          setUser(parsedUser);
-          console.log("User loaded from localStorage:", parsedUser);
-        } else {
-          toast.error("Thông tin người dùng thiếu ID. Vui lòng đăng nhập lại.");
+        const parsed = JSON.parse(storedUser);
+        if (parsed.id) setUser(parsed);
+        else {
+          toast.error("Thiếu ID người dùng. Đăng nhập lại.");
           navigate("/login");
         }
-      } catch (e) {
-        toast.error("Dữ liệu người dùng không hợp lệ. Vui lòng đăng nhập lại.");
+      } catch {
+        toast.error("Dữ liệu người dùng không hợp lệ. Đăng nhập lại.");
         navigate("/login");
       }
     } else {
-      toast.error("Vui lòng đăng nhập để tiếp tục.");
+      toast.error("Vui lòng đăng nhập.");
       navigate("/login");
     }
 
     fetchSalons()
       .then((data) => {
-        setSalons(data || []);
-        console.log("Salons fetched:", data);
-      })
-      .catch((err) => {
-        setError(err.message);
-        toast.error("Không thể tải danh sách salon: " + err.message);
-      });
-
-    // Fetch staff and filter by role=STAFF
-    axios
-      .get("http://localhost:8082/user?role=STAFF", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      })
-      .then((response) => {
-        const staff = (response.data || []).filter(
-          (user) => user.role === "STAFF"
-        );
-        setStaffList(staff);
-        console.log("Staff fetched and filtered:", staff);
-        if (!staff.length) {
-          toast.warn("Không có nhân viên nào khả dụng.");
+        if (data?.length) setSalons(data);
+        else {
+          setSalons([]);
+          toast.warn("Không tìm thấy salon.");
         }
       })
       .catch((err) => {
         setError(err.message);
-        toast.error("Không thể tải danh sách nhân viên: " + err.message);
+        setSalons([]);
+        toast.error("Lỗi tải danh sách salon: " + err.message);
       });
+
+    const fetchStaff = async () => {
+      try {
+        const res = await axios.get("http://localhost:8082/user", {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        const staff = (res.data || []).filter((u) => u.role === "STAFF");
+        setStaffList(staff);
+        if (!staff.length) {
+          toast.warn("Không có nhân viên.");
+          setStaff("");
+        }
+      } catch (err) {
+        setError(err.message);
+        toast.error("Lỗi tải danh sách nhân viên: " + err.message);
+        setStaffList([]);
+        setStaff("");
+      }
+    };
+    fetchStaff();
   }, [navigate]);
 
-  // Fetch salon data, services, and operating hours
   useEffect(() => {
-    if (!selectedSalon) {
+    if (!salon) {
       setCategories([]);
       setServices([]);
       setAllServices([]);
-      setSelectedCategory("");
+      setCategory("");
       setCurrentService("");
-      setSalonAddress("");
-      setSalonLocation(null);
-      setShowMap(false);
-      setSalonOperatingHours({ openingTime: "09:00", closingTime: "18:00" });
-      setAvailableSlots([]);
-      setSelectedStaff("");
+      setAddress("");
+      setHours({ open: "09:00", close: "18:00" });
+      setSlots([]);
+      setStaff("");
       return;
     }
 
     const loadData = async () => {
       try {
-        const [categoryData, allServicesData, filteredServicesData, salonData] =
-          await Promise.all([
-            fetchCategoriesBySalon(selectedSalon),
-            fetchServicesBySalon(selectedSalon, null),
-            fetchServicesBySalon(selectedSalon, selectedCategory || null),
-            fetchSalonById(selectedSalon),
-          ]);
+        const [catData, srvData, salonData] = await Promise.all([
+          fetchCategoriesBySalon(salon),
+          fetchServicesBySalon(salon, category || null),
+          fetchSalonById(salon),
+        ]);
 
-        const validAllServices = allServicesData.filter(
-          (s) => s.id && s.name && s.price != null && s.duration != null
-        );
-        const validFilteredServices = filteredServicesData.filter(
+        const validServices = srvData.filter(
           (s) => s.id && s.name && s.price != null && s.duration != null
         );
 
-        const validSelectedServices = selectedServices.filter((id) => {
-          const isAvailable = validAllServices.some(
-            (s) => s.id.toString() === id
-          );
-          if (!isAvailable) {
-            const service =
-              allServices.find((s) => s.id.toString() === id) ||
-              preSelectedServices?.find((s) => s.id.toString() === id);
-            if (service) {
-              toast.error(
-                `Dịch vụ "${service.name}" không có sẵn tại salon này`
-              );
-            }
-          }
-          return isAvailable;
-        });
-
-        setCategories(categoryData || []);
-        setAllServices(validAllServices);
-        setServices(validFilteredServices);
-        setSelectedServices(validSelectedServices);
+        setCategories(catData || []);
+        setAllServices(validServices);
+        setServices(validServices);
         setCurrentService("");
-        const fullAddress = `${salonData.address}, ${salonData.city}, Vietnam`;
-        setSalonAddress(fullAddress);
-        setSalonOperatingHours({
-          openingTime: salonData.openingTime.slice(0, 5),
-          closingTime: salonData.closingTime.slice(0, 5),
+        setAddress(`${salonData.address}, ${salonData.city}, Vietnam`);
+        setHours({
+          open: salonData.openingTime.slice(0, 5),
+          close: salonData.closingTime.slice(0, 5),
         });
-
-        const coords = await geocodeAddress(fullAddress);
-        setSalonLocation(coords);
       } catch (err) {
         setError(err.message);
-        toast.error(err.message);
+        toast.error("Lỗi tải dữ liệu salon: " + err.message);
+        setServices([]);
+        setAllServices([]);
       }
     };
     loadData();
-  }, [selectedSalon, selectedCategory]);
+  }, [salon, category]);
 
-  // Fetch available slots when date changes
   useEffect(() => {
-    if (selectedSalon && selectedDate) {
-      const formattedDate = selectedDate.toISOString().split("T")[0];
-      fetchAvailableSlots(selectedSalon, formattedDate)
-        .then((slots) => {
-          setAvailableSlots(slots || []);
-          console.log("Available slots fetched:", slots);
-        })
+    if (salon && date) {
+      const formattedDate = date.toISOString().split("T")[0];
+      fetchAvailableSlots(salon, formattedDate)
+        .then((data) => setSlots(data || []))
         .catch((err) => {
           setError(err.message);
-          toast.error("Không thể tải lịch trống: " + err.message);
+          toast.error("Lỗi tải lịch trống: " + err.message);
         });
     } else {
-      setAvailableSlots([]);
+      setSlots([]);
     }
-  }, [selectedSalon, selectedDate]);
+  }, [salon, date]);
 
-  // Fetch user location
-  const fetchUserLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          setShowMap(true);
-        },
-        (err) => {
-          toast.warn(
-            "Không thể lấy vị trí của bạn. Vui lòng bật quyền truy cập vị trí."
-          );
-          console.error("Geolocation error:", err);
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      toast.error("Trình duyệt không hỗ trợ định vị.");
-    }
-  };
-
-  // Geocode salon address using Nominatim
-  const geocodeAddress = async (address) => {
-    try {
-      const response = await axios.get(
-        "https://nominatim.openstreetmap.org/search",
-        {
-          params: { q: address, format: "json", limit: 1 },
-          headers: {
-            "User-Agent": "SalonBookingApp/1.0 (contact@example.com)",
-          },
-        }
-      );
-      if (response.data && response.data.length > 0) {
-        const { lat, lon } = response.data[0];
-        return { lat: parseFloat(lat), lng: parseFloat(lon) };
-      } else {
-        throw new Error("Không tìm thấy tọa độ cho địa chỉ này");
-      }
-    } catch (err) {
-      console.error("Geocoding error:", err);
-      toast.warn(
-        "Không thể lấy tọa độ salon. Sử dụng tọa độ mặc định (TP.HCM)."
-      );
-      return { lat: 10.7769, lng: 106.7009 };
-    }
-  };
-
-  // Handle service addition
-  const handleAddService = () => {
-    if (!currentService) {
-      toast.warn("Vui lòng chọn một dịch vụ");
+  const addService = () => {
+    if (!currentService) return toast.warn("Chọn dịch vụ");
+    if (selectedServices.includes(currentService)) {
+      toast.warn("Dịch vụ đã chọn");
+      setCurrentService("");
+      setDropdownOpen(false);
       return;
     }
-    if (!selectedServices.includes(currentService)) {
-      setSelectedServices((prev) => [...prev, currentService]);
-      setCurrentService("");
-    } else {
-      toast.warn("Dịch vụ này đã được chọn");
-    }
+    setSelectedServices((prev) => [...prev, currentService]);
+    setCurrentService("");
+    setDropdownOpen(false);
   };
 
-  // Handle service removal
-  const handleRemoveService = (serviceId) => {
-    setSelectedServices(selectedServices.filter((id) => id !== serviceId));
-  };
+  const removeService = (id) =>
+    setSelectedServices(selectedServices.filter((s) => s !== id));
 
-  // Handle service details click
-  const handleServiceClick = async (serviceId) => {
+  const showService = async (id) => {
     try {
-      const serviceDetails = await fetchServiceById(serviceId);
-      setShowServiceDetails(serviceDetails);
+      const details = await fetchServiceById(id);
+      setServiceDetails(details);
     } catch (err) {
-      toast.error("Không thể tải chi tiết dịch vụ: " + err.message);
+      toast.error("Lỗi tải chi tiết dịch vụ: " + err.message);
     }
   };
 
-  // Handle time slot selection
-  const handleSelectSlot = (slot) => {
-    const slotStart = new Date(slot.startTime);
-    setStartTime(slotStart);
-  };
+  const selectSlot = (slot) => setStartTime(new Date(slot.startTime));
 
-  // Generate all possible slots for the day
-  const generateAllSlots = () => {
-    if (!salonOperatingHours.openingTime || !salonOperatingHours.closingTime)
-      return [];
-    const [openHour, openMinute] = salonOperatingHours.openingTime
-      .split(":")
-      .map(Number);
-    const [closeHour, closeMinute] = salonOperatingHours.closingTime
-      .split(":")
-      .map(Number);
+  const generateSlots = () => {
+    if (!hours.open || !hours.close) return [];
+    const [openH, openM] = hours.open.split(":").map(Number);
+    const [closeH, closeM] = hours.close.split(":").map(Number);
     const slots = [];
-    let currentTime = new Date(selectedDate);
-    currentTime.setHours(openHour, openMinute, 0, 0);
+    let time = new Date(date);
+    time.setHours(openH, openM, 0, 0);
+    const closeTime = new Date(date);
+    closeTime.setHours(closeH, closeM, 0, 0);
 
-    const closeTime = new Date(selectedDate);
-    closeTime.setHours(closeHour, closeMinute, 0, 0);
-
-    while (currentTime < closeTime) {
-      const slotStart = new Date(currentTime);
-      currentTime.setMinutes(currentTime.getMinutes() + 30);
-      if (currentTime <= closeTime) {
+    while (time < closeTime) {
+      const start = new Date(time);
+      time.setMinutes(time.getMinutes() + 30);
+      if (time <= closeTime)
         slots.push({
-          startTime: slotStart.toISOString(),
-          endTime: currentTime.toISOString(),
+          startTime: start.toISOString(),
+          endTime: time.toISOString(),
         });
-      }
     }
     return slots;
   };
 
-  // Check if a slot is available
-  const isSlotAvailable = (slot) => {
-    if (availableSlots.length === 0) {
-      return true;
-    }
-    return availableSlots.some(
-      (available) =>
-        new Date(available.startTime).getTime() ===
-        new Date(slot.startTime).getTime()
-    );
-  };
+  const isSlotAvailable = (slot) =>
+    slots.length === 0 ||
+    !slots.some((b) => {
+      const bStart = new Date(b.startTime).getTime();
+      const bEnd = new Date(b.endTime).getTime();
+      const sStart = new Date(slot.startTime).getTime();
+      const sEnd = new Date(slot.endTime).getTime();
+      return sStart < bEnd && sEnd > bStart;
+    });
 
-  // Validate and proceed to next step
-  const handleNextStep = () => {
-    if (step === 1 && !selectedSalon) {
-      toast.error("Vui lòng chọn salon");
-      return;
-    }
-    if (step === 2 && selectedServices.length === 0) {
-      toast.error("Vui lòng chọn ít nhất một dịch vụ");
-      return;
-    }
-    if (step === 3 && !selectedStaff) {
-      toast.error("Vui lòng chọn nhân viên hoặc giao cho salon");
-      return;
-    }
-    if (step === 4 && (!selectedDate || !startTime)) {
-      toast.error("Vui lòng chọn ngày và giờ");
-      return;
-    }
+  const nextStep = () => {
+    if (step === 1 && !salon) return toast.error("Chọn salon");
+    if (step === 2 && !selectedServices.length)
+      return toast.error("Chọn ít nhất một dịch vụ");
+    if (step === 3 && !staff) return toast.error("Chọn nhân viên");
+    if (step === 4 && (!date || !startTime))
+      return toast.error("Chọn ngày giờ");
     if (step === 4) {
-      const startHour = startTime.getHours();
-      const startMinute = startTime.getMinutes();
-      const endTime = completionTime || startTime;
-      const endHour = endTime.getHours();
-      const endMinute = endTime.getMinutes();
-      const [openHour, openMinute] = salonOperatingHours.openingTime
-        .split(":")
-        .map(Number);
-      const [closeHour, closeMinute] = salonOperatingHours.closingTime
-        .split(":")
-        .map(Number);
+      const [openH, openM] = hours.open.split(":").map(Number);
+      const [closeH, closeM] = hours.close.split(":").map(Number);
+      const startH = startTime.getHours();
+      const startM = startTime.getMinutes();
+      const end = endTime || startTime;
+      const endH = end.getHours();
+      const endM = end.getMinutes();
+      const startMin = startH * 60 + startM;
+      const endMin = endH * 60 + endM;
+      const openMin = openH * 60 + openM;
+      const closeMin = closeH * 60 + closeM;
 
-      const startTimeInMinutes = startHour * 60 + startMinute;
-      const endTimeInMinutes = endHour * 60 + endMinute;
-      const openTimeInMinutes = openHour * 60 + openMinute;
-      const closeTimeInMinutes = closeHour * 60 + closeMinute;
-
-      if (
-        startTimeInMinutes < openTimeInMinutes ||
-        endTimeInMinutes > closeTimeInMinutes
-      ) {
-        toast.error(
-          `Thời gian đặt lịch phải nằm trong giờ hoạt động của salon (${salonOperatingHours.openingTime} - ${salonOperatingHours.closingTime})`
+      if (startMin < openMin || endMin > closeMin)
+        return toast.error(
+          `Thời gian phải trong giờ hoạt động (${hours.open} - ${hours.close})`
         );
-        return;
-      }
+      if (!endTime) return toast.error("Lỗi tính thời gian kết thúc.");
     }
-    if (step === 5 && !paymentMethod) {
-      toast.error("Vui lòng chọn phương thức thanh toán");
-      return;
-    }
-    if (step === 5) {
-      setShowBill(true);
-    } else {
-      setStep(step + 1);
-    }
+    if (step === 5 && !paymentMethod)
+      return toast.error("Chọn phương thức thanh toán");
+    if (step === 5) setShowBill(true);
+    else setStep(step + 1);
   };
 
-  // Go to previous step
-  const handlePreviousStep = () => {
-    if (step > 1) {
-      setStep(step - 1);
+  const prevStep = () => step > 1 && setStep(step - 1);
+
+  const jumpToStep = (target) => {
+    if (target > step) {
+      if (target >= 2 && !salon) return toast.error("Chọn salon trước");
+      if (target >= 3 && !selectedServices.length)
+        return toast.error("Chọn dịch vụ trước");
+      if (target >= 4 && !staff) return toast.error("Chọn nhân viên trước");
+      if (target >= 5 && (!date || !startTime))
+        return toast.error("Chọn ngày giờ trước");
     }
+    setStep(target);
   };
 
-  // Jump to a specific step
-  const handleJumpToStep = (targetStep) => {
-    if (targetStep > step) {
-      if (targetStep >= 2 && !selectedSalon) {
-        toast.error("Vui lòng chọn salon trước");
-        return;
-      }
-      if (targetStep >= 3 && selectedServices.length === 0) {
-        toast.error("Vui lòng chọn ít nhất một dịch vụ trước");
-        return;
-      }
-      if (targetStep >= 4 && !selectedStaff) {
-        toast.error("Vui lòng chọn nhân viên trước");
-        return;
-      }
-      if (targetStep >= 5 && (!selectedDate || !startTime)) {
-        toast.error("Vui lòng chọn ngày và giờ trước");
-        return;
-      }
-    }
-    setStep(targetStep);
-  };
-
-  // Handle staff selection (including random assignment)
-  const handleStaffChange = (value) => {
+  const changeStaff = (value) => {
     if (value === "random") {
-      if (staffList.length === 0) {
-        toast.warn("Không có nhân viên nào khả dụng để chọn ngẫu nhiên.");
-        setSelectedStaff("");
-      } else if (staffList.length === 1) {
-        setSelectedStaff(staffList[0].id);
-        toast.info(
-          `Chọn nhân viên duy nhất: ${
-            staffList[0].fullName ||
-            staffList[0].username ||
-            "Nhân viên không tên"
-          }`
-        );
+      if (!staffList.length) {
+        toast.error("Không có nhân viên để chọn.");
+        setStaff("");
       } else {
-        const randomStaff =
-          staffList[Math.floor(Math.random() * staffList.length)];
-        setSelectedStaff(randomStaff.id);
+        const random = staffList[Math.floor(Math.random() * staffList.length)];
+        setStaff(random.id.toString());
         toast.info(
-          `Đã chọn ngẫu nhiên: ${
-            randomStaff.fullName ||
-            randomStaff.username ||
-            "Nhân viên không tên"
+          `Chọn ngẫu nhiên: ${
+            random.fullName || random.username || "Nhân viên"
           }`
         );
       }
+    } else if (value && staffList.some((s) => s.id.toString() === value)) {
+      setStaff(value);
     } else {
-      setSelectedStaff(value);
+      setStaff("");
     }
   };
 
-  // Submit booking
-  const handleSubmit = async () => {
-    if (!user || !user.id) {
-      toast.error("Thông tin người dùng không hợp lệ. Vui lòng đăng nhập lại.");
+  const submit = async () => {
+    if (!user?.id) {
+      toast.error("Lỗi người dùng. Đăng nhập lại.");
       navigate("/login");
       return;
     }
+    if (!salon) return toast.error("Chọn salon.");
+    if (!selectedServices.length)
+      return toast.error("Chọn ít nhất một dịch vụ.");
+    if (!staff) return toast.error("Chọn nhân viên.");
+    if (!startTime) return toast.error("Chọn thời gian bắt đầu.");
+    if (!endTime) return toast.error("Lỗi thời gian kết thúc.");
+    if (totalPrice <= 0) return toast.error("Tổng giá phải lớn hơn 0.");
 
     setLoading(true);
     setError("");
 
-    const bookingRequest = {
+    const bookingReq = {
       startTime: startTime.toISOString(),
-      serviceIds: selectedServices.map((id) => parseInt(id)),
+      endTime: endTime.toISOString(),
+      staffId: Number(staff),
+      totalPrice,
+      serviceIds: selectedServices.map(Number),
     };
 
     const userData = {
@@ -534,204 +356,169 @@ const BookingPage = () => {
     };
 
     try {
-      console.log(
-        "Calling createBooking with salonId:",
-        selectedSalon,
-        "customerId:",
-        user.id,
-        "staffId:",
-        selectedStaff,
-        "bookingRequest:",
-        bookingRequest
-      );
-      const bookingResponse = await createBooking(
-        selectedSalon,
-        user.id,
-        selectedStaff,
-        bookingRequest
-      );
+      const bookingRes = await createBooking(salon, user.id, bookingReq);
       const booking = {
-        id: bookingResponse.id,
-        totalPrice: totalPrice,
-        salonId: parseInt(selectedSalon),
+        id: bookingRes.id,
+        totalPrice,
+        salonId: Number(salon),
         customerId: user.id,
-        staffId: selectedStaff,
-        startTime: bookingRequest.startTime,
-        endTime: completionTime ? completionTime.toISOString() : null,
-        status: "PENDING",
-        serviceIds: bookingRequest.serviceIds,
+        staffId: Number(staff),
+        startTime: bookingReq.startTime,
+        endTime: bookingReq.endTime,
+        serviceIds: bookingReq.serviceIds,
       };
 
-      console.log(
-        "Sending payment request with user:",
-        userData,
-        "booking:",
-        booking,
-        "paymentMethod:",
-        paymentMethod
-      );
-      const paymentResponse = await createPaymentLink(
+      const paymentRes = await createPaymentLink(
         userData,
         booking,
         paymentMethod.toUpperCase()
       );
 
-      setPaymentLink(paymentResponse);
-      setBookingStatus("CHỜ XỬ LÝ");
+      const paymentId = paymentRes.paymentLinkUrl.split("/").pop();
+      setPaymentLink(paymentRes);
+      setStatus("CHỜ XỬ LÝ");
 
-      if (
-        paymentMethod.toUpperCase() === "VNPAY" &&
-        paymentResponse.paymentLinkUrl
-      ) {
-        setShowQR(true);
-        setTimeout(async () => {
-          window.location.href = paymentResponse.paymentLinkUrl;
-          try {
-            const paymentSuccess = await proceedPayment(
-              paymentResponse.paymentLinkId,
-              paymentResponse.paymentLinkId
-            );
-            if (paymentSuccess) {
-              setBookingStatus("THÀNH CÔNG");
-              setSelectedServices([]);
-              Cookies.remove("selectedServices");
-              setShowSuccessModal(true);
-            } else {
-              setBookingStatus("THẤT BẠI");
-              setError("Thanh toán VNPAY không thành công.");
-              setShowFailureModal(true);
+      if (paymentMethod.toUpperCase() === "CASH") {
+        const success = await proceedPayment(paymentId);
+        if (success) {
+          await axios.post(
+            "http://localhost:8087/booking/save",
+            {
+              id: booking.id,
+              salonId: booking.salonId,
+              customerId: booking.customerId,
+              staffId: booking.staffId,
+              totalPrice: booking.totalPrice,
+              startTime: booking.startTime,
+              endTime: booking.endTime,
+              serviceIds: booking.serviceIds,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json",
+              },
             }
-          } catch (err) {
-            setError("Thanh toán VNPAY không thành công: " + err.message);
-            setBookingStatus("THẤT BẠI");
-            setShowFailureModal(true);
+          );
+
+          const statusRes = await axios.get(
+            `http://localhost:8087/booking/${booking.id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            }
+          );
+
+          if (statusRes.data.status === "SUCCESS") {
+            setStatus("THÀNH CÔNG");
+            setSelectedServices([]);
+            Cookies.remove("selectedServices");
+            setSuccessModal(true);
+          } else {
+            setStatus("THẤT BẠI");
+            setError("Đặt lịch thất bại: Trạng thái không phải SUCCESS");
+            setFailureModal(true);
           }
-        }, 5000);
-      } else if (paymentMethod.toUpperCase() === "CASH") {
-        setBookingStatus("THÀNH CÔNG");
-        setSelectedServices([]);
-        Cookies.remove("selectedServices");
-        setShowSuccessModal(true);
+        } else {
+          setStatus("THẤT BẠI");
+          setError("Thanh toán thất bại.");
+          setFailureModal(true);
+        }
       }
     } catch (err) {
-      setError("Đặt lịch không thành công: " + err.message);
-      setBookingStatus("THẤT BẠI");
-      setShowFailureModal(true);
+      setError("Đặt lịch thất bại: " + (err.message || "Lỗi không xác định"));
+      setStatus("THẤT BẠI");
+      setFailureModal(true);
     } finally {
       setLoading(false);
     }
   };
 
-  // Parse service steps for name and image
-  const parseSteps = (service) => {
-    const names = service.name.split("|");
-    const images = service.image.split("|");
-    return names.map((name, index) => ({
-      name,
-      image: images[index] || "",
-    }));
+  const parseSteps = (srv) => {
+    const names = srv.name.split("|");
+    const images = srv.image ? srv.image.split("|") : [];
+    return names.map((name, i) => ({ name, image: images[i] || "" }));
   };
 
-  // Filter valid description steps
-  const getValidSteps = (description) => {
-    if (!description) return [];
-    const steps = description.split("|").filter((step) => {
-      const trimmed = step.trim();
-      return (
-        trimmed.length > 0 && trimmed !== "eqwewqe" && trimmed !== "fewfdsf"
-      );
-    });
-    return steps;
-  };
-
-  const handleCloseSuccessModal = () => {
-    setShowSuccessModal(false);
-    navigate("/booking");
-  };
-
-  const handleCloseFailureModal = () => {
-    setShowFailureModal(false);
-  };
-
-  const handleCloseServiceDetails = () => {
-    setShowServiceDetails(null);
-  };
-
-  const qrCodeValue =
-    paymentLink?.paymentLinkUrl ||
-    `Payment for booking at salon ${selectedSalon} via ${paymentMethod}`;
-
-  const formatDateTime = (date) => {
-    if (!date) return "Chưa chọn";
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  };
-
-  const formatTime = (date) => {
-    return date.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  };
-
-  const path =
-    userLocation && salonLocation
-      ? [
-          [userLocation.lat, userLocation.lng],
-          [salonLocation.lat, salonLocation.lng],
-        ]
+  const getValidSteps = (desc) =>
+    desc
+      ? desc
+          .split("|")
+          .filter(
+            (step) =>
+              step.trim().length > 0 &&
+              step.trim() !== "eqwewqe" &&
+              step.trim() !== "fewfdsf"
+          )
       : [];
+
+  const closeSuccess = () => {
+    setSuccessModal(false);
+    navigate("/");
+  };
+
+  const closeFailure = () => setFailureModal(false);
+
+  const closeDetails = () => setServiceDetails(null);
+
+  const formatDateTime = (d) =>
+    d
+      ? d.toLocaleString("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+      : "Chưa chọn";
+
+  const formatTime = (d) =>
+    d.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
 
   return (
     <div className="min-h-screen bg-gray-100">
       <Helmet>
-        <title>Đặt Lịch Salon - Dịch Vụ Làm Đẹp Chuyên Nghiệp</title>
-        <meta
-          name="description"
-          content="Đặt lịch hẹn tại salon làm đẹp với quy trình dễ dàng, chọn dịch vụ, nhân viên, thời gian và thanh toán trực tuyến. Đảm bảo trải nghiệm tuyệt vời!"
-        />
+        <title>Đặt Lịch Salon</title>
+        <meta name="description" content="Đặt lịch hẹn salon dễ dàng." />
         <meta
           name="keywords"
-          content="đặt lịch salon, làm đẹp, dịch vụ salon, cắt tóc, gội đầu, VNPay"
+          content="đặt lịch salon, làm đẹp, dịch vụ salon"
         />
       </Helmet>
       <ToastContainer />
-      <div className="container mx-auto px-4 py-10 mt-16 animate-slide-in">
+      <div className="container mx-auto px-4 py-10 mt-16">
         <h1 className="text-4xl font-bold text-amber-900 mb-8 text-center">
           Đặt Lịch Hẹn
         </h1>
-        {error && !showFailureModal && (
+        {error && !failureModal && (
           <p className="text-red-500 mb-4 text-center">{error}</p>
         )}
 
-        {/* Step Navigation */}
         <div className="mb-8">
-          <div className="flex justify-between items-center gap-2">
+          <div className="flex justify-between gap-2">
             {[
               "Chọn Salon",
               "Chọn Dịch Vụ",
               "Chọn Nhân Viên",
               "Chọn Thời Gian",
-              "Phương Thức Thanh Toán",
-            ].map((label, index) => (
+              "Thanh Toán",
+            ].map((label, i) => (
               <button
-                key={index}
-                onClick={() => handleJumpToStep(index + 1)}
-                className={`flex-1 text-center py-3 rounded-lg transition-all duration-300 ${
-                  step > index + 1
+                key={i}
+                onClick={() => jumpToStep(i + 1)}
+                className={`flex-1 py-3 rounded-lg transition-all duration-300 ${
+                  step > i + 1
                     ? "bg-green-500 text-white hover:bg-green-600"
-                    : step === index + 1
+                    : step === i + 1
                     ? "bg-amber-600 text-white"
                     : "bg-gray-300 text-gray-700 hover:bg-gray-400"
                 } focus:outline-none focus:ring-2 focus:ring-amber-600`}
-                aria-label={`Chuyển đến bước ${label}`}
               >
                 {label}
               </button>
@@ -739,85 +526,85 @@ const BookingPage = () => {
           </div>
         </div>
 
-        {/* Step Content */}
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-3xl mx-auto transition-all duration-500">
+        <div className="bg-white p-8 rounded-xl shadow-lg max-w-3xl mx-auto">
           {step === 1 && (
             <div>
               <h2 className="text-2xl font-semibold text-amber-900 mb-6">
-                Bước 1: Chọn Salon
+                Chọn Salon
               </h2>
               <select
-                value={selectedSalon}
+                value={salon}
                 onChange={(e) => {
-                  setSelectedSalon(e.target.value);
-                  setSelectedCategory("");
+                  setSalon(e.target.value);
+                  setCategory("");
                   setCurrentService("");
-                  setSelectedDate(null);
+                  setDate(null);
                   setStartTime(null);
-                  setSelectedStaff("");
+                  setStaff("");
                 }}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 transition-all"
-                aria-label="Chọn salon"
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+                disabled={!salons.length}
               >
                 <option value="">Chọn salon</option>
-                {salons.map((salon) => (
-                  <option key={salon.id} value={salon.id}>
-                    {salon.name}
+                {salons.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
               </select>
+              {!salons.length && (
+                <p className="text-red-500 mt-2">Không có salon khả dụng.</p>
+              )}
             </div>
           )}
 
           {step === 2 && (
             <div>
               <h2 className="text-2xl font-semibold text-amber-900 mb-6">
-                Bước 2: Chọn Dịch Vụ
+                Chọn Dịch Vụ
               </h2>
               <div className="mb-6">
                 <label className="block text-amber-900 font-medium mb-2">
-                  Chọn Danh Mục (Tùy Chọn)
+                  Danh Mục
                 </label>
                 <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 transition-all"
-                  aria-label="Chọn danh mục dịch vụ"
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setCurrentService("");
+                  }}
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
                 >
-                  <option value="">Tất cả danh mục</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
+                  <option value="">Tất cả</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="mb-6">
                 <label className="block text-amber-900 font-medium mb-2">
-                  Chọn Dịch Vụ
+                  Dịch Vụ
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex gap-3">
                   <div className="relative flex-1">
                     <button
                       type="button"
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 bg-white text-left flex items-center justify-between transition-all"
-                      aria-expanded={isDropdownOpen}
-                      aria-controls="service-dropdown"
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      className="w-full p-3 border rounded-lg bg-white text-left flex justify-between focus:outline-none focus:ring-2 focus:ring-amber-600"
                       disabled={!services.length}
                     >
                       <span>
                         {currentService
                           ? services
-                              .find(
-                                (srv) => srv.id.toString() === currentService
-                              )
+                              .find((s) => s.id.toString() === currentService)
                               ?.name.split("|")[0] || "Chọn dịch vụ"
                           : "Chọn dịch vụ"}
                       </span>
                       <svg
-                        className={`w-5 h-5 transform transition-transform ${
-                          isDropdownOpen ? "rotate-180" : ""
+                        className={`w-5 h-5 transition-transform ${
+                          dropdownOpen ? "rotate-180" : ""
                         }`}
                         fill="none"
                         stroke="currentColor"
@@ -831,62 +618,55 @@ const BookingPage = () => {
                         />
                       </svg>
                     </button>
-                    {isDropdownOpen && (
-                      <ul
-                        id="service-dropdown"
-                        className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto"
-                        role="listbox"
-                      >
-                        {services
-                          .filter(
-                            (srv) =>
-                              !selectedServices.includes(srv.id.toString())
-                          )
-                          .map((srv) => (
-                            <li
-                              key={srv.id}
-                              onClick={() => {
-                                setCurrentService(srv.id.toString());
-                                setIsDropdownOpen(false);
-                              }}
-                              className="flex items-center gap-3 p-3 hover:bg-gray-100 cursor-pointer transition-all"
-                              role="option"
-                              tabIndex={0}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  setCurrentService(srv.id.toString());
-                                  setIsDropdownOpen(false);
-                                }
-                              }}
-                            >
-                              <img
-                                src={
-                                  srv.image
-                                    ? `http://localhost:8083/service-offering-images/${
-                                        srv.image.split("|")[0]
-                                      }`
-                                    : "/placeholder-image.png"
-                                }
-                                alt={srv.name.split("|")[0]}
-                                className="w-6 h-6 object-cover rounded"
-                                onError={(e) => {
-                                  e.target.src = "/placeholder-image.png";
+                    {dropdownOpen && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {services.length ? (
+                          services
+                            .filter(
+                              (s) => !selectedServices.includes(s.id.toString())
+                            )
+                            .map((s) => (
+                              <li
+                                key={s.id}
+                                onClick={() => {
+                                  setCurrentService(s.id.toString());
+                                  setDropdownOpen(false);
                                 }}
-                              />
-                              <div className="flex-1">
-                                <span>{srv.name.split("|")[0]}</span>
-                                <span className="block text-sm text-gray-600">
-                                  {(srv.price || 0).toLocaleString("vi-VN")} VND
-                                  ({srv.duration || 0} phút)
-                                </span>
-                              </div>
-                            </li>
-                          ))}
-                        {services.filter(
-                          (srv) => !selectedServices.includes(srv.id.toString())
-                        ).length === 0 && (
+                                className="flex gap-3 p-3 hover:bg-gray-100 cursor-pointer"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    setCurrentService(s.id.toString());
+                                    setDropdownOpen(false);
+                                  }
+                                }}
+                              >
+                                <img
+                                  src={
+                                    s.image
+                                      ? `http://localhost:8083/service-offering-images/${
+                                          s.image.split("|")[0]
+                                        }`
+                                      : "/placeholder-image.png"
+                                  }
+                                  alt={s.name.split("|")[0]}
+                                  className="w-6 h-6 object-cover rounded"
+                                  onError={(e) =>
+                                    (e.target.src = "/placeholder-image.png")
+                                  }
+                                />
+                                <div className="flex-1">
+                                  <span>{s.name.split("|")[0]}</span>
+                                  <span className="block text-sm text-gray-600">
+                                    {(s.price || 0).toLocaleString("vi-VN")} VND
+                                    ({s.duration || 0} phút)
+                                  </span>
+                                </div>
+                              </li>
+                            ))
+                        ) : (
                           <li className="p-3 text-gray-500">
-                            Không có dịch vụ nào
+                            Không có dịch vụ
                           </li>
                         )}
                       </ul>
@@ -894,66 +674,60 @@ const BookingPage = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={handleAddService}
-                    className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-all"
+                    onClick={addService}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                     disabled={!currentService}
-                    aria-label="Thêm dịch vụ"
                   >
                     Thêm
                   </button>
                 </div>
               </div>
-              {selectedServiceDetails.length > 0 && (
+              {selectedDetails.length > 0 && (
                 <div>
                   <p className="text-amber-900 font-medium mb-3">
                     Dịch vụ đã chọn:
                   </p>
                   <ul className="space-y-3">
-                    {selectedServiceDetails.map((srv) => (
+                    {selectedDetails.map((s) => (
                       <li
-                        key={srv.id}
-                        className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg hover:bg-gray-100 cursor-pointer transition-all"
-                        onClick={() => handleServiceClick(srv.id)}
-                        role="button"
+                        key={s.id}
+                        className="flex gap-4 bg-gray-50 p-3 rounded-lg hover:bg-gray-100 cursor-pointer"
+                        onClick={() => showService(s.id)}
                         tabIndex={0}
                         onKeyDown={(e) =>
-                          e.key === "Enter" && handleServiceClick(srv.id)
+                          e.key === "Enter" && showService(s.id)
                         }
-                        aria-label={`Xem chi tiết dịch vụ ${
-                          srv.name.split("|")[0]
-                        }`}
                       >
                         <img
                           src={
-                            srv.image
+                            s.image
                               ? `http://localhost:8083/service-offering-images/${
-                                  srv.image.split("|")[0]
+                                  s.image.split("|")[0]
                                 }`
                               : "/placeholder-image.png"
                           }
-                          alt={srv.name.split("|")[0]}
+                          alt={s.name.split("|")[0]}
                           className="w-20 h-20 object-cover rounded-lg"
-                          onError={(e) => {
-                            e.target.src = "/placeholder-image.png";
-                          }}
+                          onError={(e) =>
+                            (e.target.src = "/placeholder-image.png")
+                          }
                         />
                         <div className="flex-1">
                           <span className="font-medium">
-                            {srv.name.split("|")[0]}
+                            {s.name.split("|")[0]}
                           </span>
                           <span className="block text-sm text-gray-600">
-                            {(srv.price || 0).toLocaleString("vi-VN")} VND (
-                            {srv.duration || 0} phút)
+                            {(s.price || 0).toLocaleString("vi-VN")} VND (
+                            {s.duration || 0} phút)
                           </span>
                         </div>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleRemoveService(srv.id.toString());
+                            removeService(s.id.toString());
                           }}
                           className="text-red-500 hover:text-red-700 font-semibold"
-                          aria-label={`Xóa dịch vụ ${srv.name.split("|")[0]}`}
                         >
                           Xóa
                         </button>
@@ -968,67 +742,65 @@ const BookingPage = () => {
           {step === 3 && (
             <div>
               <h2 className="text-2xl font-semibold text-amber-900 mb-6">
-                Bước 3: Chọn Nhân Viên
+                Chọn Nhân Viên
               </h2>
               <select
-                value={selectedStaff}
-                onChange={(e) => handleStaffChange(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 transition-all"
-                aria-label="Chọn nhân viên"
-                disabled={staffList.length === 0}
+                value={staff}
+                onChange={(e) => changeStaff(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
+                disabled={!staffList.length}
               >
                 <option value="">Chọn nhân viên</option>
-                <option value="random">Giao cho salon chọn</option>
-                {staffList.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.fullName || staff.username || "Nhân viên không tên"}
+                <option value="random">Giao cho salon</option>
+                {staffList.map((s) => (
+                  <option key={s.id} value={s.id.toString()}>
+                    {s.fullName || s.username || "Nhân viên"}
                   </option>
                 ))}
               </select>
-              {staffList.length === 0 && (
-                <p className="text-red-500 mt-2">
-                  Không có nhân viên nào khả dụng.
-                </p>
+              {!staffList.length && (
+                <p className="text-red-500 mt-2">Không có nhân viên.</p>
               )}
+              <p className="text-sm text-gray-600 mt-2">
+                Chọn "Giao cho salon" để phân bổ ngẫu nhiên.
+              </p>
             </div>
           )}
 
           {step === 4 && (
             <div>
               <h2 className="text-2xl font-semibold text-amber-900 mb-6">
-                Bước 4: Chọn Ngày và Giờ
+                Chọn Ngày Giờ
               </h2>
               <div className="mb-6">
                 <label className="block text-amber-900 font-medium mb-2">
-                  Chọn Ngày
+                  Ngày
                 </label>
                 <DatePicker
-                  selected={selectedDate}
-                  onChange={(date) => setSelectedDate(date)}
+                  selected={date}
+                  onChange={setDate}
                   minDate={new Date()}
                   dateFormat="dd/MM/yyyy"
                   locale={vi}
                   placeholderText="Chọn ngày"
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 transition-all"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
                   wrapperClassName="w-full"
-                  aria-label="Chọn ngày"
                 />
               </div>
-              {selectedDate && (
+              {date && (
                 <div>
                   <label className="block text-amber-900 font-medium mb-2">
-                    Chọn Giờ ({salonOperatingHours.openingTime} -{" "}
-                    {salonOperatingHours.closingTime})
+                    Giờ ({hours.open} - {hours.close})
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {generateAllSlots().map((slot, index) => (
+                    {generateSlots().map((slot, i) => (
                       <button
-                        key={index}
+                        key={i}
                         onClick={() =>
-                          isSlotAvailable(slot) && handleSelectSlot(slot)
+                          isSlotAvailable(slot) && selectSlot(slot)
                         }
                         disabled={!isSlotAvailable(slot)}
-                        className={`p-3 rounded-lg text-center transition-all ${
+                        className={`p-3 rounded-lg text-center ${
                           isSlotAvailable(slot)
                             ? startTime &&
                               new Date(slot.startTime).getTime() ===
@@ -1037,9 +809,6 @@ const BookingPage = () => {
                               : "bg-green-100 hover:bg-green-200 text-green-900"
                             : "bg-gray-300 text-gray-500 cursor-not-allowed"
                         }`}
-                        aria-label={`Chọn khung giờ ${formatTime(
-                          new Date(slot.startTime)
-                        )}`}
                       >
                         {formatTime(new Date(slot.startTime))}
                       </button>
@@ -1053,163 +822,126 @@ const BookingPage = () => {
           {step === 5 && (
             <div>
               <h2 className="text-2xl font-semibold text-amber-900 mb-6">
-                Bước 5: Chọn Phương Thức Thanh Toán
+                Thanh Toán
               </h2>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600 transition-all"
-                aria-label="Chọn phương thức thanh toán"
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-amber-600"
               >
                 <option value="">Chọn phương thức</option>
-                <option value="VNPAY">VNPay</option>
                 <option value="CASH">Tiền mặt</option>
               </select>
             </div>
           )}
 
-          {/* Navigation Buttons */}
           <div className="mt-8 flex justify-between">
             {step > 1 && (
               <button
-                onClick={handlePreviousStep}
-                className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-all"
-                aria-label="Quay lại bước trước"
+                onClick={prevStep}
+                className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
               >
                 Quay Lại
               </button>
             )}
             <button
-              onClick={handleNextStep}
-              className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all"
-              aria-label={step === 5 ? "Xem hóa đơn" : "Tiếp theo"}
+              onClick={nextStep}
+              className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
             >
-              {step === 5 ? "Xem Hóa Đơn" : "Tiếp Theo"}
+              {step === 5 ? "Hóa Đơn" : "Tiếp"}
             </button>
           </div>
         </div>
 
-        {/* Bill Display */}
         {showBill && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-12 rounded-xl shadow-2xl max-w-4xl w-full h-[90vh] overflow-y-auto animate-fade-in">
+            <div className="bg-white p-12 rounded-xl max-w-4xl w-full h-[90vh] overflow-y-auto">
               <h2 className="text-3xl font-bold text-amber-900 mb-6">
-                Hóa Đơn Đặt Lịch
+                Hóa Đơn
               </h2>
               <div className="mb-6 space-y-3">
-                <p className="text-gray-700">
+                <p>
                   <strong>Salon:</strong>{" "}
-                  {salons.find((s) => s.id == selectedSalon)?.name ||
+                  {salons.find((s) => s.id === Number(salon))?.name ||
                     "Đang chọn"}
                 </p>
-                <p className="text-gray-700">
-                  <strong>Địa chỉ:</strong> {salonAddress}
+                <p>
+                  <strong>Địa chỉ:</strong> {address}
                 </p>
-                <p className="text-gray-700">
+                <p>
                   <strong>Nhân viên:</strong>{" "}
-                  {staffList.find((s) => s.id == selectedStaff)?.fullName ||
-                    staffList.find((s) => s.id == selectedStaff)?.username ||
-                    "Giao cho salon chọn"}
+                  {staffList.find((s) => s.id === Number(staff))?.fullName ||
+                    staffList.find((s) => s.id === Number(staff))?.username ||
+                    "Chưa chọn"}
                 </p>
-                <p className="text-gray-700">
-                  <strong>Thời gian bắt đầu:</strong>{" "}
-                  {formatDateTime(startTime)}
+                <p>
+                  <strong>Bắt đầu:</strong> {formatDateTime(startTime)}
                 </p>
-                <p className="text-gray-700">
-                  <strong>Thời gian hoàn thành:</strong>{" "}
-                  {formatDateTime(completionTime)}
+                <p>
+                  <strong>Kết thúc:</strong> {formatDateTime(endTime)}
                 </p>
-                <p className="text-gray-700">
-                  <strong>Phương thức thanh toán:</strong>{" "}
-                  {paymentMethod.toUpperCase()}
+                <p>
+                  <strong>Thanh toán:</strong> {paymentMethod.toUpperCase()}
                 </p>
               </div>
               <h3 className="text-xl font-semibold text-amber-900 mb-3">
-                Dịch Vụ Đã Chọn
-                <span className="text-green-600 font-semibold ml-2">
-                  ({selectedServiceDetails.length} dịch vụ)
-                </span>
+                Dịch Vụ ({selectedDetails.length})
               </h3>
-              <ul className="mb-6 space-y-4 max-w-full">
-                {selectedServiceDetails.length > 0 ? (
-                  selectedServiceDetails.map((srv) => (
-                    <li
-                      key={srv.id}
-                      className="flex items-center gap-6 text-gray-700 py-3"
-                    >
+              <ul className="mb-6 space-y-4">
+                {selectedDetails.length ? (
+                  selectedDetails.map((s) => (
+                    <li key={s.id} className="flex gap-6 py-3">
                       <img
                         src={
-                          srv.image
+                          s.image
                             ? `http://localhost:8083/service-offering-images/${
-                                srv.image.split("|")[0]
+                                s.image.split("|")[0]
                               }`
                             : "/placeholder-image.png"
                         }
-                        alt={srv.name.split("|")[0]}
+                        alt={s.name.split("|")[0]}
                         className="w-16 h-16 object-cover rounded-lg"
-                        onError={(e) => {
-                          e.target.src = "/placeholder-image.png";
-                        }}
+                        onError={(e) =>
+                          (e.target.src = "/placeholder-image.png")
+                        }
                       />
                       <div className="flex-1">
-                        <span>{srv.name.split("|")[0]}</span>
+                        <span>{s.name.split("|")[0]}</span>
                         <span className="block text-sm">
-                          {(srv.price || 0).toLocaleString("vi-VN")} VND
+                          {(s.price || 0).toLocaleString("vi-VN")} VND
                         </span>
                       </div>
-                      <div className="flex gap-4">
-                        <button
-                          type="button"
-                          onClick={() => handleServiceClick(srv.id)}
-                          className="px-4 py-1 border border-amber-600 text-amber-600 font-semibold rounded-md hover:bg-amber-600 hover:text-white transition duration-200 cursor-pointer"
-                          aria-label={`Xem chi tiết dịch vụ ${
-                            srv.name.split("|")[0]
-                          }`}
-                        >
-                          Xem chi tiết
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => showService(s.id)}
+                        className="px-4 py-1 border border-amber-600 text-amber-600 rounded-md hover:bg-amber-600 hover:text-white"
+                      >
+                        Chi tiết
+                      </button>
                     </li>
                   ))
                 ) : (
-                  <li className="text-gray-700">
-                    Không có dịch vụ nào được chọn
-                  </li>
+                  <li>Không có dịch vụ.</li>
                 )}
               </ul>
               <p className="text-2xl text-amber-700 font-bold">
-                Tổng cộng: {totalPrice.toLocaleString("vi-VN")} VND
+                Tổng: {totalPrice.toLocaleString("vi-VN")} VND
               </p>
               <p className="text-gray-700 mt-2">
-                Tổng thời gian: {totalDuration} phút
+                Thời gian: {totalDuration} phút
               </p>
-
-              {showQR &&
-                paymentMethod &&
-                paymentMethod.toUpperCase() === "VNPAY" && (
-                  <div className="mt-6 text-center max-w-sm mx-auto">
-                    <p className="text-gray-700 mb-3">
-                      Quét mã QR để thanh toán qua VNPay
-                    </p>
-                    <QRCode value={qrCodeValue} size={150} />
-                  </div>
-                )}
-
               <div className="mt-8 flex justify-end gap-4">
                 <button
                   onClick={() => setShowBill(false)}
-                  className="px-8 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-all"
-                  aria-label="Hủy hóa đơn"
+                  className="px-8 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                 >
                   Hủy
                 </button>
                 <button
-                  onClick={handleSubmit}
+                  onClick={submit}
                   disabled={loading}
-                  className={`px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all ${
+                  className={`px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 ${
                     loading ? "opacity-50 cursor-not-allowed" : ""
                   }`}
-                  aria-label="Xác nhận đặt lịch"
                 >
                   {loading ? "Đang xử lý..." : "Đặt Lịch"}
                 </button>
@@ -1218,18 +950,16 @@ const BookingPage = () => {
           </div>
         )}
 
-        {/* Service Details Modal */}
-        {showServiceDetails && (
+        {serviceDetails && (
           <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-            <div className="bg-white p-12 rounded-xl shadow-2xl w-full max-w-[95vw] h-[95vh] overflow-y-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-8">
+            <div className="bg-white p-12 rounded-xl w-full max-w-[95vw] h-[95vh] overflow-y-auto">
+              <div className="flex justify-between mb-8">
                 <h2 className="text-3xl font-bold text-amber-900">
-                  Chi Tiết Dịch Vụ: {showServiceDetails.name.split("|")[0]}
+                  Chi Tiết: {serviceDetails.name.split("|")[0]}
                 </h2>
                 <button
-                  onClick={handleCloseServiceDetails}
-                  className="w-10 h-10 bg-gray-200 text-gray-700 rounded-full flex items-center justify-center hover:bg-gray-300 transition-all"
-                  aria-label="Đóng chi tiết dịch vụ"
+                  onClick={closeDetails}
+                  className="w-10 h-10 bg-gray-200 text-gray-700 rounded-full flex items-center justify-center hover:bg-gray-300"
                 >
                   ×
                 </button>
@@ -1237,108 +967,92 @@ const BookingPage = () => {
               <div className="mb-8">
                 <img
                   src={
-                    showServiceDetails.image
+                    serviceDetails.image
                       ? `http://localhost:8083/service-offering-images/${
-                          showServiceDetails.image.split("|")[0]
+                          serviceDetails.image.split("|")[0]
                         }`
                       : "/placeholder-image.png"
                   }
-                  alt={showServiceDetails.name.split("|")[0]}
+                  alt={serviceDetails.name.split("|")[0]}
                   className="w-full max-w-md h-64 object-cover rounded-lg mb-6 mx-auto"
-                  onError={(e) => {
-                    e.target.src = "/placeholder-image.png";
-                  }}
+                  onError={(e) => (e.target.src = "/placeholder-image.png")}
                 />
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-left">
-                    <tbody>
-                      <tr className="bg-gray-50">
-                        <td className="p-4 font-semibold text-amber-900">
-                          Tên Dịch Vụ
-                        </td>
-                        <td className="p-4 text-gray-700">
-                          {showServiceDetails.name.split("|")[0]}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-amber-900">
-                          Giá
-                        </td>
-                        <td className="p-4 text-gray-700">
-                          {(showServiceDetails.price || 0).toLocaleString(
-                            "vi-VN"
-                          )}{" "}
-                          VND
-                        </td>
-                      </tr>
-                      <tr className="bg-gray-50">
-                        <td className="p-4 font-semibold text-amber-900">
-                          Thời Gian
-                        </td>
-                        <td className="p-4 text-gray-700">
-                          {showServiceDetails.duration || 0} phút
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <table className="w-full text-left border rounded-lg">
+                  <tbody>
+                    <tr className="bg-gray-50">
+                      <td className="p-4 font-semibold text-amber-900">Tên</td>
+                      <td className="p-4">
+                        {serviceDetails.name.split("|")[0]}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-4 font-semibold text-amber-900">Giá</td>
+                      <td className="p-4">
+                        {(serviceDetails.price || 0).toLocaleString("vi-VN")}{" "}
+                        VND
+                      </td>
+                    </tr>
+                    <tr className="bg-gray-50">
+                      <td className="p-4 font-semibold text-amber-900">
+                        Thời gian
+                      </td>
+                      <td className="p-4">
+                        {serviceDetails.duration || 0} phút
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              {getValidSteps(showServiceDetails.description).length > 0 && (
+              {getValidSteps(serviceDetails.description).length > 0 && (
                 <div>
                   <h3 className="text-xl font-semibold text-amber-900 mb-6">
-                    Các Bước Thực Hiện
+                    Các Bước
                   </h3>
                   <div className="space-y-6">
-                    {(() => {
-                      const steps = parseSteps(showServiceDetails);
-                      const descriptions = getValidSteps(
-                        showServiceDetails.description
-                      );
-                      return steps.slice(1).map((step, index) => (
+                    {parseSteps(serviceDetails)
+                      .slice(1)
+                      .map((step, i) => (
                         <div
-                          key={index}
-                          className="flex items-start gap-4 p-6 bg-gray-50 rounded-lg shadow-sm"
+                          key={i}
+                          className="flex gap-4 p-6 bg-gray-50 rounded-lg shadow-sm"
                         >
-                          <div className="flex-shrink-0 w-12 h-12 bg-amber-600 text-white rounded-full flex items-center justify-center text-lg font-semibold">
-                            {index + 1}
+                          <div className="w-12 h-12 bg-amber-600 text-white rounded-full flex items-center justify-center text-lg font-semibold">
+                            {i + 1}
                           </div>
                           <div className="flex-1">
                             <p className="text-lg font-semibold text-gray-700">
-                              {index === 0 ? "Dịch vụ" : `Bước ${index + 1}`}:{" "}
-                              {step.name || "Không có tên"}
+                              Bước {i + 1}: {step.name || "Không tên"}
                             </p>
                             <p className="text-gray-700 text-lg mt-2">
-                              {descriptions[index]
-                                ? descriptions[index].trim()
-                                : "Không có mô tả"}
+                              {getValidSteps(serviceDetails.description)[
+                                i
+                              ]?.trim() || "Không mô tả"}
                             </p>
                             {step.image && (
                               <img
                                 src={`http://localhost:8083/service-offering-images/${step.image}`}
-                                alt={`Hình ảnh bước ${index + 1}`}
+                                alt={`Bước ${i + 1}`}
                                 className="mt-4 w-32 h-32 object-cover rounded-lg"
-                                onError={(e) => {
-                                  e.target.src = "/placeholder-image.png";
-                                }}
+                                onError={(e) =>
+                                  (e.target.src = "/placeholder-image.png")
+                                }
                               />
                             )}
                           </div>
                         </div>
-                      ));
-                    })()}
+                      ))}
                   </div>
                 </div>
               )}
-              {getValidSteps(showServiceDetails.description).length === 0 && (
+              {!getValidSteps(serviceDetails.description).length && (
                 <p className="text-gray-700 text-lg">
-                  Không có thông tin về các bước thực hiện
+                  Không có thông tin bước.
                 </p>
               )}
               <div className="mt-10 flex justify-end">
                 <button
-                  onClick={handleCloseServiceDetails}
-                  className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all"
-                  aria-label="Đóng chi tiết dịch vụ"
+                  onClick={closeDetails}
+                  className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
                 >
                   Đóng
                 </button>
@@ -1347,71 +1061,21 @@ const BookingPage = () => {
           </div>
         )}
 
-        {/* Map */}
-        {selectedSalon && (
-          <div className="mt-8 text-center">
-            <button
-              onClick={fetchUserLocation}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
-              aria-label="Hiển thị bản đồ chỉ đường"
-            >
-              Chỉ Đường Đến Salon
-            </button>
-          </div>
-        )}
-
-        {showMap && selectedSalon && userLocation && salonLocation && (
-          <div className="mt-8">
-            <h2 className="text-2xl font-bold text-amber-900 mb-4">
-              Đường đi đến{" "}
-              {salons.find((s) => s.id == selectedSalon)?.name || "Salon"}
-            </h2>
-            <MapContainer
-              center={[userLocation.lat, userLocation.lng]}
-              zoom={12}
-              style={{ height: "400px", width: "100%" }}
-              className="rounded-lg shadow-md"
-            >
-              <TileLayer
-                url="https://://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              <Marker position={[userLocation.lat, userLocation.lng]}>
-                <Popup>Vị trí của bạn</Popup>
-              </Marker>
-              <Marker position={[salonLocation.lat, salonLocation.lng]}>
-                <Popup>
-                  {salons.find((s) => s.id == selectedSalon)?.name || "Salon"}
-                </Popup>
-              </Marker>
-              {path.length > 0 && (
-                <Polyline
-                  positions={path}
-                  color="#ff7800"
-                  weight={5}
-                  opacity={0.65}
-                />
-              )}
-            </MapContainer>
-          </div>
-        )}
-
-        {/* Modals */}
-        {showSuccessModal && (
+        {successModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full text-center animate-fade-in">
+            <div className="bg-white p-8 rounded-xl max-w-md w-full text-center">
               <h2 className="text-3xl font-bold text-green-600 mb-4">
-                Đặt Lịch Thành Công
+                Thành Công
               </h2>
               <p className="text-gray-700 mb-6">
-                Lịch hẹn của bạn tại{" "}
-                {salons.find((s) => s.id == selectedSalon)?.name || "salon"} đã
-                được xác nhận.
+                Lịch hẹn tại{" "}
+                {salons.find((s) => s.id === Number(salon))?.name || "salon"} đã
+                xác nhận.
               </p>
               <button
-                onClick={handleCloseSuccessModal}
-                className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all"
-                aria-label="Đóng thông báo thành công"
+                onClick={closeSuccess}
+                className="Languages
+px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
               >
                 OK
               </button>
@@ -1419,19 +1083,16 @@ const BookingPage = () => {
           </div>
         )}
 
-        {showFailureModal && (
+        {failureModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-8 rounded-xl shadow-2KILL max-w-md w-full text-center animate-fade-in">
-              <h2 className="text-3xl font-bold text-red-600 mb-4">
-                Đặt Lịch Thất Bại
-              </h2>
+            <div className="bg-white p-8 rounded-xl max-w-md w-full text-center">
+              <h2 className="text-3xl font-bold text-red-600 mb-4">Thất Bại</h2>
               <p className="text-gray-700 mb-6">
-                {error || "Đã xảy ra lỗi khi đặt lịch. Vui lòng thử lại."}
+                {error || "Lỗi đặt lịch. Thử lại."}
               </p>
               <button
-                onClick={handleCloseFailureModal}
-                className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all"
-                aria-label="Đóng thông báo thất bại"
+                onClick={closeFailure}
+                className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
               >
                 OK
               </button>
