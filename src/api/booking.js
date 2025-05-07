@@ -221,13 +221,10 @@ export const createPaymentLink = async (user, booking, paymentMethod) => {
   try {
     const bookingDTO = {
       id: booking.id,
-      totalPrice: booking.totalPrice,
       salonId: booking.salonId,
-      customerId: booking.customerId,
+      totalPrice: booking.totalPrice,
       startTime: booking.startTime,
       endTime: booking.endTime,
-      serviceIds: booking.serviceIds,
-      staffId: booking.staffId,
     };
     const response = await axios.post(
       `${API_BASE_URL}:8085/payments/create?paymentMethod=${paymentMethod}`,
@@ -239,14 +236,35 @@ export const createPaymentLink = async (user, booking, paymentMethod) => {
         },
       }
     );
-    console.log("createPaymentLink response:", response.data);
-    return { paymentLinkUrl: response.data.payment_link_url };
+    console.log(
+      "createPaymentLink raw response:",
+      JSON.stringify(response.data, null, 2)
+    );
+
+    // Handle alternative field names
+    const data = response.data;
+    const paymentLinkUrl =
+      data.payment_link_url || data.paymentLinkUrl || data.paymentUrl || "";
+    const paymentId =
+      data.getPayment_link_id || data.get_payment_link_id || data.id;
+
+    if (paymentMethod.toUpperCase() !== "CASH" && !paymentLinkUrl) {
+      throw new Error(
+        "Phản hồi thanh toán thiếu URL thanh toán cho phương thức không phải CASH"
+      );
+    }
+
+    return {
+      payment_link_url: paymentLinkUrl,
+      getPayment_link_id: paymentId,
+    };
   } catch (error) {
     const errorMessage = error.response
       ? `Lỗi server: ${error.response.status} - ${
           error.response.data.message || error.message
         }`
       : `Không kết nối được payment service: ${error.message}`;
+    console.error("createPaymentLink error:", errorMessage);
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }

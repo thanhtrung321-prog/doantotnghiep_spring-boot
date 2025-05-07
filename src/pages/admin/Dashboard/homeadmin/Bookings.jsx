@@ -404,7 +404,7 @@ const Bookings = () => {
         .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       setTotalRevenue(revenue);
       const completed = updatedBookings.filter(
-        (booking) => booking.statustoUpperCase() === "COMPLETED"
+        (booking) => booking.status.toUpperCase() === "COMPLETED"
       ).length;
       setCompletedBookings(completed);
       // Update revenue chart
@@ -1154,7 +1154,7 @@ const Bookings = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300">
+                <label className="block text-sm font-medium text-gray- dejamos de 300">
                   Thời gian kết thúc
                 </label>
                 <DatePicker

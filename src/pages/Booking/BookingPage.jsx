@@ -440,24 +440,29 @@ const BookingPage = () => {
       };
 
       console.log("Creating payment link...");
-      let paymentRes;
-      if (paymentMethod.toUpperCase() === "CASH") {
-        paymentRes = {
-          paymentLinkUrl: `http://localhost:8085/payments/mock-${booking.id}`,
-        };
-        console.log("Mock payment link created for CASH:", paymentRes);
-      } else {
-        paymentRes = await createPaymentLink(
-          userData,
-          booking,
-          paymentMethod.toUpperCase()
-        );
-        console.log("Payment link created:", paymentRes);
-      }
+      const paymentRes = await createPaymentLink(
+        userData,
+        booking,
+        paymentMethod.toUpperCase()
+      );
+      console.log(
+        "Payment link response:",
+        JSON.stringify(paymentRes, null, 2)
+      );
 
-      const paymentId = paymentRes.paymentLinkUrl.split("/").pop();
+      const paymentId = paymentRes.getPayment_link_id;
       setPaymentLink(paymentRes);
       setStatus("CHỜ XỬ LÝ");
+
+      let paymentSuccess = paymentMethod.toUpperCase() === "CASH";
+      if (!paymentSuccess) {
+        console.log("Processing payment for ID:", paymentId);
+        paymentSuccess = await proceedPayment(paymentId);
+        console.log("Payment processing result:", paymentSuccess);
+        if (!paymentSuccess) {
+          throw new Error("Thanh toán thất bại: Không thể xử lý thanh toán.");
+        }
+      }
 
       console.log("Saving booking to database...");
       await axios.post(
@@ -471,6 +476,7 @@ const BookingPage = () => {
           startTime: booking.startTime,
           endTime: booking.endTime,
           serviceIds: booking.serviceIds,
+          paymentId: paymentId,
         },
         {
           headers: {
@@ -479,16 +485,7 @@ const BookingPage = () => {
           },
         }
       );
-      console.log("Booking saved");
-
-      if (paymentMethod.toUpperCase() !== "CASH") {
-        console.log("Processing payment for ID:", paymentId);
-        const success = await proceedPayment(paymentId);
-        console.log("Payment processing result:", success);
-        if (!success) {
-          throw new Error("Thanh toán thất bại: Không thể xử lý thanh toán.");
-        }
-      }
+      console.log("Booking saved with paymentId:", paymentId);
 
       console.log("Checking booking status...");
       let statusRes;
