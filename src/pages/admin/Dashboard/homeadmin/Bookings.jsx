@@ -13,6 +13,7 @@ import {
   Edit,
   Star,
   List,
+  Eye,
 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -20,8 +21,16 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { vi } from "date-fns/locale";
 import axios from "axios";
-import { Pie } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Pie, Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+} from "chart.js";
 import {
   fetchBookings,
   fetchServices,
@@ -36,7 +45,14 @@ import {
   fetchBookingRating,
 } from "../../api/apiadmin/bookingadmin";
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale
+);
 
 const Bookings = () => {
   const [salonId, setSalonId] = useState("");
@@ -52,6 +68,8 @@ const Bookings = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditStatusModal, setShowEditStatusModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
   const [showReport, setShowReport] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [bookedSlots, setBookedSlots] = useState([]);
@@ -78,30 +96,32 @@ const Bookings = () => {
     datasets: [],
   });
 
-  // Convert UTC date to Asia/Ho_Chi_Minh local date string (yyyy-MM-dd)
+  // Convert date to Asia/Ho_Chi_Minh local date string (yyyy-MM-dd)
   const toLocalDateString = (date) => {
     if (!date) return null;
-    const offset = 7 * 60 * 60 * 1000; // +7 hours
-    const localDate = new Date(date.getTime() + offset);
-    return localDate.toISOString().split("T")[0]; // e.g., "2025-05-08"
+    return new Date(date).toLocaleDateString("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "Asia/Ho_Chi_Minh",
+    }); // Returns yyyy-MM-dd
   };
 
-  // Format date to Asia/Ho_Chi_Minh with 24h format
+  // Format date to Asia/Ho_Chi_Minh with 24h format (HH:mm, dd/MM/yyyy)
   const formatDateTime = (dateString) => {
     if (!dateString) return "N/A";
     const date = new Date(dateString);
-    const offset = 7 * 60 * 60 * 1000; // +7 hours
-    const localDate = new Date(date.getTime() + offset);
-    return localDate
+    return date
       .toLocaleString("vi-VN", {
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: false, // Ensure 24h format
+        hour12: false,
+        timeZone: "Asia/Ho_Chi_Minh",
       })
-      .replace(/(\d{2})\/(\d{2})\/(\d{4}), (\d{2}:\d{2})/, "$4, $1/$2/$3"); // Format to HH:mm, dd/MM/yyyy
+      .replace(/(\d{2})\/(\d{2})\/(\d{4}), (\d{2}:\d{2})/, "$4, $1/$2/$3");
   };
 
   // Fetch salons and staff on mount
@@ -175,7 +195,7 @@ const Bookings = () => {
         setCompletedBookings(completed);
         // Main chart data (bookings and revenue by date)
         const bookingsByDate = bookingsArray.reduce((acc, booking) => {
-          const date = toLocalDateString(new Date(booking.startTime)); // Use yyyy-MM-dd
+          const date = toLocalDateString(new Date(booking.startTime));
           if (!acc[date]) {
             acc[date] = { count: 0, revenue: 0 };
           }
@@ -192,6 +212,7 @@ const Bookings = () => {
               day: "2-digit",
               month: "2-digit",
               year: "numeric",
+              timeZone: "Asia/Ho_Chi_Minh",
             })
           );
         const counts = Object.keys(bookingsByDate)
@@ -235,24 +256,54 @@ const Bookings = () => {
             },
           ],
         });
-        // Revenue chart data (SUCCESS vs COMPLETED)
+        // Revenue chart data (PENDING, CONFIRMED, SUCCESS, COMPLETED, CANCELLED)
+        const pendingRevenue = bookingsArray
+          .filter((booking) => booking.status.toUpperCase() === "PENDING")
+          .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
+        const confirmedRevenue = bookingsArray
+          .filter((booking) => booking.status.toUpperCase() === "CONFIRMED")
+          .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
         const successRevenue = bookingsArray
           .filter((booking) => booking.status.toUpperCase() === "SUCCESS")
           .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
         const completedRevenue = bookingsArray
           .filter((booking) => booking.status.toUpperCase() === "COMPLETED")
           .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
+        const cancelledRevenue = bookingsArray
+          .filter((booking) => booking.status.toUpperCase() === "CANCELLED")
+          .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
         setRevenueChartData({
-          labels: ["Thành công", "Hoàn thành"],
+          labels: [
+            "Chờ xử lý",
+            "Đã xác nhận",
+            "Thành công",
+            "Hoàn thành",
+            "Đã hủy",
+          ],
           datasets: [
             {
               label: "Doanh thu (VND)",
-              data: [successRevenue, completedRevenue],
-              backgroundColor: [
-                "rgba(54, 162, 235, 0.6)",
-                "rgba(75, 192, 192, 0.6)",
+              data: [
+                pendingRevenue,
+                confirmedRevenue,
+                successRevenue,
+                completedRevenue,
+                cancelledRevenue,
               ],
-              borderColor: ["rgba(54, 162, 235, 1)", "rgba(75, 192, 192, 1)"],
+              backgroundColor: [
+                "rgba(255, 206, 86, 0.6)", // PENDING
+                "rgba(75, 192, 192, 0.6)", // CONFIRMED
+                "rgba(54, 162, 235, 0.6)", // SUCCESS
+                "rgba(153, 102, 255, 0.6)", // COMPLETED
+                "rgba(255, 99, 132, 0.6)", // CANCELLED
+              ],
+              borderColor: [
+                "rgba(255, 206, 86, 1)",
+                "rgba(75, 192, 192, 1)",
+                "rgba(54, 162, 235, 1)",
+                "rgba(153, 102, 255, 1)",
+                "rgba(255, 99, 132, 1)",
+              ],
               borderWidth: 1,
             },
           ],
@@ -341,6 +392,10 @@ const Bookings = () => {
       );
       setBookings(updatedBookings);
       setFilteredBookings(updatedBookings);
+      // Update selectedBooking if it's the one being edited
+      if (selectedBooking && selectedBooking.id === bookingId) {
+        setSelectedBooking(updatedBooking);
+      }
       // Recalculate revenue and completed bookings
       const revenue = updatedBookings
         .filter((booking) =>
@@ -349,27 +404,57 @@ const Bookings = () => {
         .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       setTotalRevenue(revenue);
       const completed = updatedBookings.filter(
-        (booking) => booking.status.toUpperCase() === "COMPLETED"
+        (booking) => booking.statustoUpperCase() === "COMPLETED"
       ).length;
       setCompletedBookings(completed);
       // Update revenue chart
+      const pendingRevenue = updatedBookings
+        .filter((booking) => booking.status.toUpperCase() === "PENDING")
+        .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
+      const confirmedRevenue = updatedBookings
+        .filter((booking) => booking.status.toUpperCase() === "CONFIRMED")
+        .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       const successRevenue = updatedBookings
         .filter((booking) => booking.status.toUpperCase() === "SUCCESS")
         .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       const completedRevenue = updatedBookings
         .filter((booking) => booking.status.toUpperCase() === "COMPLETED")
         .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
+      const cancelledRevenue = updatedBookings
+        .filter((booking) => booking.status.toUpperCase() === "CANCELLED")
+        .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       setRevenueChartData({
-        labels: ["Thành công", "Hoàn thành"],
+        labels: [
+          "Chờ xử lý",
+          "Đã xác nhận",
+          "Thành công",
+          "Hoàn thành",
+          "Đã hủy",
+        ],
         datasets: [
           {
             label: "Doanh thu (VND)",
-            data: [successRevenue, completedRevenue],
-            backgroundColor: [
-              "rgba(54, 162, 235, 0.6)",
-              "rgba(75, 192, 192, 0.6)",
+            data: [
+              pendingRevenue,
+              confirmedRevenue,
+              successRevenue,
+              completedRevenue,
+              cancelledRevenue,
             ],
-            borderColor: ["rgba(54, 162, 235, 1)", "rgba(75, 192, 192, 1)"],
+            backgroundColor: [
+              "rgba(255, 206, 86, 0.6)", // PENDING
+              "rgba(75, 192, 192, 0.6)", // CONFIRMED
+              "rgba(54, 162, 235, 0.6)", // SUCCESS
+              "rgba(153, 102, 255, 0.6)", // COMPLETED
+              "rgba(255, 99, 132, 0.6)", // CANCELLED
+            ],
+            borderColor: [
+              "rgba(255, 206, 86, 1)",
+              "rgba(75, 192, 192, 1)",
+              "rgba(54, 162, 235, 1)",
+              "rgba(153, 102, 255, 1)",
+              "rgba(255, 99, 132, 1)",
+            ],
             borderWidth: 1,
           },
         ],
@@ -399,8 +484,8 @@ const Bookings = () => {
     }
     try {
       const bookingRequest = {
-        startTime: newBooking.startTime?.toISOString(),
-        endTime: newBooking.endTime?.toISOString(),
+        startTime: newBooking.startTime.toISOString(),
+        endTime: newBooking.endTime.toISOString(),
         staffId: Number(newBooking.staffId),
         serviceIds: newBooking.serviceIds.map(Number),
         totalPrice: Number(newBooking.totalPrice),
@@ -416,8 +501,8 @@ const Bookings = () => {
         customerId: Number(newBooking.customerId),
         staffId: Number(newBooking.staffId),
         totalPrice: Number(newBooking.totalPrice),
-        startTime: newBooking.startTime?.toISOString(),
-        endTime: newBooking.endTime?.toISOString(),
+        startTime: newBooking.startTime.toISOString(),
+        endTime: newBooking.endTime.toISOString(),
         serviceIds: newBooking.serviceIds.map(Number),
         status: "PENDING",
       };
@@ -437,23 +522,53 @@ const Bookings = () => {
       ).length;
       setCompletedBookings(completed);
       // Update revenue chart
+      const pendingRevenue = updatedBookings
+        .filter((booking) => booking.status.toUpperCase() === "PENDING")
+        .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
+      const confirmedRevenue = updatedBookings
+        .filter((booking) => booking.status.toUpperCase() === "CONFIRMED")
+        .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       const successRevenue = updatedBookings
         .filter((booking) => booking.status.toUpperCase() === "SUCCESS")
         .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       const completedRevenue = updatedBookings
         .filter((booking) => booking.status.toUpperCase() === "COMPLETED")
         .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
+      const cancelledRevenue = updatedBookings
+        .filter((booking) => booking.status.toUpperCase() === "CANCELLED")
+        .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
       setRevenueChartData({
-        labels: ["Thành công", "Hoàn thành"],
+        labels: [
+          "Chờ xử lý",
+          "Đã xác nhận",
+          "Thành công",
+          "Hoàn thành",
+          "Đã hủy",
+        ],
         datasets: [
           {
             label: "Doanh thu (VND)",
-            data: [successRevenue, completedRevenue],
-            backgroundColor: [
-              "rgba(54, 162, 235, 0.6)",
-              "rgba(75, 192, 192, 0.6)",
+            data: [
+              pendingRevenue,
+              confirmedRevenue,
+              successRevenue,
+              completedRevenue,
+              cancelledRevenue,
             ],
-            borderColor: ["rgba(54, 162, 235, 1)", "rgba(75, 192, 192, 1)"],
+            backgroundColor: [
+              "rgba(255, 206, 86, 0.6)", // PENDING
+              "rgba(75, 192, 192, 0.6)", // CONFIRMED
+              "rgba(54, 162, 235, 0.6)", // SUCCESS
+              "rgba(153, 102, 255, 0.6)", // COMPLETED
+              "rgba(255, 99, 132, 0.6)", // CANCELLED
+            ],
+            borderColor: [
+              "rgba(255, 206, 86, 1)",
+              "rgba(75, 192, 192, 1)",
+              "rgba(54, 162, 235, 1)",
+              "rgba(153, 102, 255, 1)",
+              "rgba(255, 99, 132, 1)",
+            ],
             borderWidth: 1,
           },
         ],
@@ -482,6 +597,12 @@ const Bookings = () => {
     } catch (error) {
       toast.error(error.message || "Không thể tải đánh giá");
     }
+  };
+
+  // Handle view booking details
+  const handleViewDetails = (booking) => {
+    setSelectedBooking(booking);
+    setShowDetailModal(true);
   };
 
   // Get status color
@@ -587,18 +708,35 @@ const Bookings = () => {
           </div>
           <div className="w-full md:w-1/3">
             <h4 className="text-lg font-semibold text-gray-200 mb-2">
-              Phân bố doanh thu
+              Doanh thu theo trạng thái
             </h4>
-            <Pie
-              data={revenueChartData}
-              options={{
-                responsive: true,
-                plugins: {
-                  legend: { position: "bottom", labels: { color: "white" } },
-                  title: { display: false },
-                },
-              }}
-            />
+            <div className="max-w-md">
+              <Bar
+                data={revenueChartData}
+                options={{
+                  responsive: true,
+                  plugins: {
+                    legend: { position: "top", labels: { color: "white" } },
+                    title: {
+                      display: true,
+                      text: "Doanh thu theo trạng thái (VND)",
+                      color: "white",
+                    },
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: { color: "white" },
+                      grid: { color: "rgba(255, 255, 255, 0.1)" },
+                    },
+                    x: {
+                      ticks: { color: "white" },
+                      grid: { color: "rgba(255, 255, 255, 0.1)" },
+                    },
+                  },
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -657,11 +795,7 @@ const Bookings = () => {
           </select>
           <DatePicker
             selected={dateFilter}
-            onChange={(date) =>
-              setDateFilter(
-                date ? new Date(date.getTime() - 7 * 60 * 60 * 1000) : null
-              )
-            }
+            onChange={(date) => setDateFilter(date)}
             dateFormat="dd/MM/yyyy"
             locale={vi}
             placeholderText="Chọn ngày"
@@ -721,37 +855,37 @@ const Bookings = () => {
 
       {/* Booking table */}
       <div className="overflow-x-auto bg-gray-800 text-white rounded-xl shadow-2xl">
-        <table className="min-w-full divide-y divide-gray-700">
+        <table className="min-w-full divide-y divide-gray-700 table-fixed">
           <thead className="bg-gray-900">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 ID
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Khách hàng
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Thời gian bắt đầu
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Thời gian kết thúc
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Nhân viên
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Trạng thái
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Tổng tiền
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Hành động
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Dịch vụ
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th className="w-1/12 px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                 Đánh giá
               </th>
             </tr>
@@ -781,10 +915,12 @@ const Bookings = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                     #{booking.id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-2 text-gray-400" />
-                      {customers[booking.customerId] || booking.customerId}
+                  <td className="px-6 py-4 text-sm text-gray-300">
+                    <div className="flex items-center truncate">
+                      <User className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">
+                        {customers[booking.customerId] || booking.customerId}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
@@ -799,11 +935,13 @@ const Bookings = () => {
                       {formatDateTime(booking.endTime)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                    <div className="flex items-center">
-                      <Scissors className="h-4 w-4 mr-2 text-gray-400" />
-                      {staffList.find((s) => s.id === booking.staffId)
-                        ?.fullName || `Nhân viên ${booking.staffId}`}
+                  <td className="px-6 py-4 text-sm text-gray-300">
+                    <div className="flex items-center truncate">
+                      <Scissors className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">
+                        {staffList.find((s) => s.id === booking.staffId)
+                          ?.fullName || `Nhân viên ${booking.staffId}`}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -844,14 +982,23 @@ const Bookings = () => {
                       >
                         <Edit className="h-4 w-4" />
                       </button>
+                      <button
+                        onClick={() => handleViewDetails(booking)}
+                        className="text-cyan-400 hover:text-cyan-300"
+                        title="Xem chi tiết"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-300">
-                    <div className="flex items-center">
-                      <Tag className="h-4 w-4 mr-2 text-gray-400" />
-                      {booking.serviceIds
-                        .map((id) => services[id] || `Dịch vụ ${id}`)
-                        .join(", ")}
+                    <div className="flex items-center truncate">
+                      <Tag className="h-4 w-4 mr-2 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">
+                        {booking.serviceIds
+                          .map((id) => services[id] || `Dịch vụ ${id}`)
+                          .join(", ")}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1001,6 +1148,7 @@ const Bookings = () => {
                   showTimeSelect
                   dateFormat="dd/MM/yyyy HH:mm"
                   locale={vi}
+                  timeZone="Asia/Ho_Chi_Minh"
                   className="mt-1 block w-full py-2 px-3 border border-gray-600 bg-gray-700 text-white rounded-md"
                   placeholderText="Chọn thời gian bắt đầu"
                 />
@@ -1017,6 +1165,7 @@ const Bookings = () => {
                   showTimeSelect
                   dateFormat="dd/MM/yyyy HH:mm"
                   locale={vi}
+                  timeZone="Asia/Ho_Chi_Minh"
                   className="mt-1 block w-full py-2 px-3 border border-gray-600 bg-gray-700 text-white rounded-md"
                   placeholderText="Chọn thời gian kết thúc"
                 />
@@ -1124,6 +1273,113 @@ const Bookings = () => {
                 className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition"
               >
                 Cập nhật
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail modal */}
+      {showDetailModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 text-white p-6 rounded-xl max-w-lg w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-purple-300">
+                Chi tiết đặt lịch #{selectedBooking.id}
+              </h2>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="text-gray-400 hover:text-gray-300"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  ID đặt lịch
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  #{selectedBooking.id}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  Khách hàng
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  {customers[selectedBooking.customerId] ||
+                    selectedBooking.customerId}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  Thời gian bắt đầu
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  {formatDateTime(selectedBooking.startTime)}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  Thời gian kết thúc
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  {formatDateTime(selectedBooking.endTime)}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  Nhân viên
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  {staffList.find((s) => s.id === selectedBooking.staffId)
+                    ?.fullName || `Nhân viên ${selectedBooking.staffId}`}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  Trạng thái
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  {selectedBooking.status === "PENDING"
+                    ? "Chờ xử lý"
+                    : selectedBooking.status === "CONFIRMED"
+                    ? "Đã xác nhận"
+                    : selectedBooking.status === "SUCCESS"
+                    ? "Thành công"
+                    : selectedBooking.status === "COMPLETED"
+                    ? "Hoàn thành"
+                    : selectedBooking.status === "CANCELLED"
+                    ? "Đã hủy"
+                    : selectedBooking.status}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  Tổng tiền
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  {(selectedBooking.totalPrice || 0).toLocaleString("vi-VN")} đ
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300">
+                  Dịch vụ
+                </label>
+                <p className="mt-1 text-sm text-gray-400">
+                  {selectedBooking.serviceIds
+                    .map((id) => services[id] || `Dịch vụ ${id}`)
+                    .join(", ")}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="px-4 py-2 bg-gray-600 text-gray-300 rounded-lg hover:bg-gray-500"
+              >
+                Đóng
               </button>
             </div>
           </div>

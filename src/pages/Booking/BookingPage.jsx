@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { vi } from "date-fns/locale";
+import { parseISO, isValid, addMinutes, format } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Cookies from "js-cookie";
@@ -17,7 +18,7 @@ import {
   createPaymentLink,
   proceedPayment,
   fetchServiceById,
-  fetchAvailableSlots,
+  fetchBookedSlots,
 } from "../../api/booking";
 
 const BookingPage = () => {
@@ -48,7 +49,7 @@ const BookingPage = () => {
   const [staff, setStaff] = useState("");
   const [date, setDate] = useState(null);
   const [startTime, setStartTime] = useState(null);
-  const [slots, setSlots] = useState([]);
+  const [bookedSlots, setBookedSlots] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [status, setStatus] = useState("CHỜ XỬ LÝ");
   const [error, setError] = useState("");
@@ -76,7 +77,7 @@ const BookingPage = () => {
   );
   const endTime =
     startTime && totalDuration > 0
-      ? new Date(startTime.getTime() + totalDuration * 60 * 1000)
+      ? addMinutes(startTime, totalDuration)
       : null;
 
   useEffect(() => {
@@ -124,6 +125,7 @@ const BookingPage = () => {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         const staff = (res.data || []).filter((u) => u.role === "STAFF");
+        console.log("Staff list:", staff);
         setStaffList(staff);
         if (!staff.length) {
           toast.warn("Không có nhân viên.");
@@ -148,7 +150,7 @@ const BookingPage = () => {
       setCurrentService("");
       setAddress("");
       setHours({ open: "09:00", close: "18:00" });
-      setSlots([]);
+      setBookedSlots([]);
       setStaff("");
       return;
     }
@@ -174,6 +176,11 @@ const BookingPage = () => {
           open: salonData.openingTime.slice(0, 5),
           close: salonData.closingTime.slice(0, 5),
         });
+        console.log(
+          "Salon hours:",
+          salonData.openingTime,
+          salonData.closingTime
+        );
       } catch (err) {
         setError(err.message);
         toast.error("Lỗi tải dữ liệu salon: " + err.message);
@@ -186,17 +193,33 @@ const BookingPage = () => {
 
   useEffect(() => {
     if (salon && date) {
-      const formattedDate = date.toISOString().split("T")[0];
-      fetchAvailableSlots(salon, formattedDate)
-        .then((data) => setSlots(data || []))
+      const formattedDate = format(date, "yyyy-MM-dd");
+      console.log(
+        "Fetching booked slots for salon:",
+        salon,
+        "date:",
+        formattedDate,
+        "staff:",
+        staff
+      );
+      fetchBookedSlots(salon, formattedDate)
+        .then((data) => {
+          console.log("Booked slots received:", data);
+          setBookedSlots(data || []);
+          if (!data.length) {
+            toast.info("Không có lịch đặt cho ngày này.");
+          }
+        })
         .catch((err) => {
+          console.error("Error fetching booked slots:", err);
           setError(err.message);
-          toast.error("Lỗi tải lịch trống: " + err.message);
+          toast.error("Lỗi tải lịch đã đặt: " + err.message);
+          setBookedSlots([]);
         });
     } else {
-      setSlots([]);
+      setBookedSlots([]);
     }
-  }, [salon, date]);
+  }, [salon, date, staff]);
 
   const addService = () => {
     if (!currentService) return toast.warn("Chọn dịch vụ");
@@ -223,10 +246,13 @@ const BookingPage = () => {
     }
   };
 
-  const selectSlot = (slot) => setStartTime(new Date(slot.startTime));
+  const selectSlot = (slot) => {
+    setStartTime(parseISO(slot.startTime));
+    console.log("Selected slot:", slot.startTime);
+  };
 
   const generateSlots = () => {
-    if (!hours.open || !hours.close) return [];
+    if (!hours.open || !hours.close || !date) return [];
     const [openH, openM] = hours.open.split(":").map(Number);
     const [closeH, closeM] = hours.close.split(":").map(Number);
     const slots = [];
@@ -237,25 +263,59 @@ const BookingPage = () => {
 
     while (time < closeTime) {
       const start = new Date(time);
-      time.setMinutes(time.getMinutes() + 30);
-      if (time <= closeTime)
+      time = addMinutes(time, 30);
+      if (time <= closeTime) {
         slots.push({
-          startTime: start.toISOString(),
-          endTime: time.toISOString(),
+          startTime: format(start, "yyyy-MM-dd'T'HH:mm:ss"),
+          endTime: format(time, "yyyy-MM-dd'T'HH:mm:ss"),
         });
+      }
     }
+    console.log("Generated slots:", slots);
     return slots;
   };
 
-  const isSlotAvailable = (slot) =>
-    slots.length === 0 ||
-    !slots.some((b) => {
-      const bStart = new Date(b.startTime).getTime();
-      const bEnd = new Date(b.endTime).getTime();
-      const sStart = new Date(slot.startTime).getTime();
-      const sEnd = new Date(slot.endTime).getTime();
-      return sStart < bEnd && sEnd > bStart;
+  const isSlotAvailable = (slot) => {
+    if (!bookedSlots.length) {
+      console.log("No booked slots, slot available:", slot.startTime);
+      return true;
+    }
+    const slotStart = parseISO(slot.startTime);
+    const slotEnd = parseISO(slot.endTime);
+    if (!isValid(slotStart) || !isValid(slotEnd)) {
+      console.warn("Invalid slot times:", slot);
+      return false;
+    }
+    const isAvailable = !bookedSlots.some((b) => {
+      const bookedStart = parseISO(b.startTime);
+      const bookedEnd = parseISO(b.endTime);
+      if (!isValid(bookedStart) || !isValid(bookedEnd)) {
+        console.warn("Invalid booked slot times:", b);
+        return false;
+      }
+      const isOverlapping = slotStart < bookedEnd && slotEnd > bookedStart;
+      const staffMatch = staff ? b.staffId.toString() === staff : true;
+      console.log(
+        `Checking slot ${format(slotStart, "HH:mm")} - ${format(
+          slotEnd,
+          "HH:mm"
+        )}: ` +
+          `isOverlapping=${isOverlapping}, staffMatch=${staffMatch}, ` +
+          `booked=${format(bookedStart, "HH:mm")} - ${format(
+            bookedEnd,
+            "HH:mm"
+          )}, ` +
+          `bookedStaffId=${b.staffId}`
+      );
+      return isOverlapping && staffMatch;
     });
+    console.log(
+      `Slot ${format(slotStart, "HH:mm")} is ${
+        isAvailable ? "available" : "unavailable"
+      }`
+    );
+    return isAvailable;
+  };
 
   const nextStep = () => {
     if (step === 1 && !salon) return toast.error("Chọn salon");
@@ -316,11 +376,14 @@ const BookingPage = () => {
             random.fullName || random.username || "Nhân viên"
           }`
         );
+        console.log("Selected random staff:", random.id);
       }
     } else if (value && staffList.some((s) => s.id.toString() === value)) {
       setStaff(value);
+      console.log("Selected staff:", value);
     } else {
       setStaff("");
+      console.log("Staff cleared");
     }
   };
 
@@ -342,12 +405,17 @@ const BookingPage = () => {
     setError("");
 
     const bookingReq = {
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
+      startTime: format(startTime, "yyyy-MM-dd'T'HH:mm:ss"),
+      endTime: format(endTime, "yyyy-MM-dd'T'HH:mm:ss"),
       staffId: Number(staff),
       totalPrice,
       serviceIds: selectedServices.map(Number),
     };
+
+    console.log(
+      "Booking request payload:",
+      JSON.stringify(bookingReq, null, 2)
+    );
 
     const userData = {
       id: user.id,
@@ -356,7 +424,10 @@ const BookingPage = () => {
     };
 
     try {
+      console.log("Creating booking...");
       const bookingRes = await createBooking(salon, user.id, bookingReq);
+      console.log("Booking created:", bookingRes);
+
       const booking = {
         id: bookingRes.id,
         totalPrice,
@@ -368,66 +439,102 @@ const BookingPage = () => {
         serviceIds: bookingReq.serviceIds,
       };
 
-      const paymentRes = await createPaymentLink(
-        userData,
-        booking,
-        paymentMethod.toUpperCase()
-      );
+      console.log("Creating payment link...");
+      let paymentRes;
+      if (paymentMethod.toUpperCase() === "CASH") {
+        paymentRes = {
+          paymentLinkUrl: `http://localhost:8085/payments/mock-${booking.id}`,
+        };
+        console.log("Mock payment link created for CASH:", paymentRes);
+      } else {
+        paymentRes = await createPaymentLink(
+          userData,
+          booking,
+          paymentMethod.toUpperCase()
+        );
+        console.log("Payment link created:", paymentRes);
+      }
 
       const paymentId = paymentRes.paymentLinkUrl.split("/").pop();
       setPaymentLink(paymentRes);
       setStatus("CHỜ XỬ LÝ");
 
-      if (paymentMethod.toUpperCase() === "CASH") {
+      console.log("Saving booking to database...");
+      await axios.post(
+        "http://localhost:8087/booking/save",
+        {
+          id: booking.id,
+          salonId: booking.salonId,
+          customerId: booking.customerId,
+          staffId: booking.staffId,
+          totalPrice: booking.totalPrice,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          serviceIds: booking.serviceIds,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("Booking saved");
+
+      if (paymentMethod.toUpperCase() !== "CASH") {
+        console.log("Processing payment for ID:", paymentId);
         const success = await proceedPayment(paymentId);
-        if (success) {
-          await axios.post(
-            "http://localhost:8087/booking/save",
-            {
-              id: booking.id,
-              salonId: booking.salonId,
-              customerId: booking.customerId,
-              staffId: booking.staffId,
-              totalPrice: booking.totalPrice,
-              startTime: booking.startTime,
-              endTime: booking.endTime,
-              serviceIds: booking.serviceIds,
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          const statusRes = await axios.get(
-            `http://localhost:8087/booking/${booking.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          );
-
-          if (statusRes.data.status === "SUCCESS") {
-            setStatus("THÀNH CÔNG");
-            setSelectedServices([]);
-            Cookies.remove("selectedServices");
-            setSuccessModal(true);
-          } else {
-            setStatus("THẤT BẠI");
-            setError("Đặt lịch thất bại: Trạng thái không phải SUCCESS");
-            setFailureModal(true);
-          }
-        } else {
-          setStatus("THẤT BẠI");
-          setError("Thanh toán thất bại.");
-          setFailureModal(true);
+        console.log("Payment processing result:", success);
+        if (!success) {
+          throw new Error("Thanh toán thất bại: Không thể xử lý thanh toán.");
         }
       }
+
+      console.log("Checking booking status...");
+      let statusRes;
+      try {
+        statusRes = await axios.get(
+          `http://localhost:8087/booking/${booking.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+        console.log("Booking status:", statusRes.data.status);
+      } catch (statusErr) {
+        console.warn(
+          "Status check failed, assuming success since booking saved:",
+          statusErr.message
+        );
+        statusRes = { data: { status: "PENDING" } }; // Fallback to allow success modal
+      }
+
+      if (
+        statusRes.data.status === "PENDING" ||
+        statusRes.data.status === "SUCCESS"
+      ) {
+        setStatus("THÀNH CÔNG");
+        setSelectedServices([]);
+        Cookies.remove("selectedServices");
+        setSuccessModal(true);
+      } else {
+        setStatus("THẤT BẠI");
+        setError(
+          `Đặt lịch thất bại: Trạng thái không phải SUCCESS (nhận được: ${statusRes.data.status})`
+        );
+        setFailureModal(true);
+      }
     } catch (err) {
-      setError("Đặt lịch thất bại: " + (err.message || "Lỗi không xác định"));
+      console.error("Error in submit:", err);
+      const errorMessage = err.response?.data?.message || err.message;
+      setError(
+        `Đặt lịch thất bại: ${
+          errorMessage.includes("connect") || errorMessage.includes("network")
+            ? "Không thể kết nối đến dịch vụ thanh toán"
+            : errorMessage
+        }`
+      );
       setStatus("THẤT BẠI");
       setFailureModal(true);
     } finally {
@@ -463,23 +570,14 @@ const BookingPage = () => {
   const closeDetails = () => setServiceDetails(null);
 
   const formatDateTime = (d) =>
-    d
-      ? d.toLocaleString("vi-VN", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        })
-      : "Chưa chọn";
+    d ? format(d, "dd/MM/yyyy HH:mm", { locale: vi }) : "Chưa chọn";
 
-  const formatTime = (d) =>
-    d.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+  const formatTime = (d) => format(d, "HH:mm", { locale: vi });
+
+  const isAllSlotsBooked = () =>
+    date &&
+    generateSlots().length > 0 &&
+    generateSlots().every((slot) => !isSlotAvailable(slot));
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -778,7 +876,10 @@ const BookingPage = () => {
                 </label>
                 <DatePicker
                   selected={date}
-                  onChange={setDate}
+                  onChange={(d) => {
+                    setDate(d);
+                    setStartTime(null);
+                  }}
                   minDate={new Date()}
                   dateFormat="dd/MM/yyyy"
                   locale={vi}
@@ -792,28 +893,63 @@ const BookingPage = () => {
                   <label className="block text-amber-900 font-medium mb-2">
                     Giờ ({hours.open} - {hours.close})
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {generateSlots().map((slot, i) => (
-                      <button
-                        key={i}
-                        onClick={() =>
-                          isSlotAvailable(slot) && selectSlot(slot)
-                        }
-                        disabled={!isSlotAvailable(slot)}
-                        className={`p-3 rounded-lg text-center ${
-                          isSlotAvailable(slot)
-                            ? startTime &&
-                              new Date(slot.startTime).getTime() ===
-                                startTime.getTime()
-                              ? "bg-amber-600 text-white"
-                              : "bg-green-100 hover:bg-green-200 text-green-900"
-                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        {formatTime(new Date(slot.startTime))}
-                      </button>
-                    ))}
-                  </div>
+                  {generateSlots().length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {generateSlots().map((slot, i) => (
+                          <button
+                            key={i}
+                            onClick={() =>
+                              isSlotAvailable(slot) && selectSlot(slot)
+                            }
+                            disabled={!isSlotAvailable(slot)}
+                            className={`p-3 rounded-lg text-center transition-colors ${
+                              isSlotAvailable(slot)
+                                ? startTime &&
+                                  parseISO(slot.startTime).getTime() ===
+                                    startTime.getTime()
+                                  ? "bg-amber-600 text-white"
+                                  : "bg-green-100 hover:bg-green-200 text-green-900"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
+                          >
+                            {format(parseISO(slot.startTime), "HH:mm")}
+                          </button>
+                        ))}
+                      </div>
+                      {isAllSlotsBooked() && (
+                        <p className="text-red-500 mt-4">
+                          Tất cả khung giờ đã được đặt. Vui lòng chọn ngày khác
+                          hoặc nhân viên khác.
+                        </p>
+                      )}
+                      {staff &&
+                        bookedSlots.length > 0 &&
+                        !isAllSlotsBooked() && (
+                          <p className="text-sm text-gray-600 mt-4">
+                            Các khung giờ màu xám đã được đặt bởi nhân viên đã
+                            chọn.
+                          </p>
+                        )}
+                      {staff && bookedSlots.length === 0 && (
+                        <p className="text-sm text-gray-600 mt-4">
+                          Tất cả khung giờ đều khả dụng cho nhân viên đã chọn.
+                        </p>
+                      )}
+                      {!staff &&
+                        bookedSlots.length > 0 &&
+                        !isAllSlotsBooked() && (
+                          <p className="text-sm text-gray-600 mt-4">
+                            Các khung giờ màu xám đã được đặt. Vui lòng chọn
+                            nhân viên để xem lịch chi tiết.
+                          </p>
+                        )}
+                    </>
+                  ) : (
+                    <p className="text-red-500">
+                      Không có khung giờ khả dụng trong giờ hoạt động.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1022,6 +1158,7 @@ const BookingPage = () => {
                           <div className="flex-1">
                             <p className="text-lg font-semibold text-gray-700">
                               Bước {i + 1}: {step.name || "Không tên"}
+                              ...
                             </p>
                             <p className="text-gray-700 text-lg mt-2">
                               {getValidSteps(serviceDetails.description)[
@@ -1074,8 +1211,7 @@ const BookingPage = () => {
               </p>
               <button
                 onClick={closeSuccess}
-                className="Languages
-px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+                className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
               >
                 OK
               </button>

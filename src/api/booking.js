@@ -26,6 +26,7 @@ export const fetchCategoriesBySalon = async (salonId) => {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       }
     );
+    console.log("fetchCategoriesBySalon response:", response.data);
     return response.data || [];
   } catch (error) {
     const errorMessage = error.response
@@ -47,6 +48,7 @@ export const fetchServicesBySalon = async (salonId, categoryId = null) => {
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
+    console.log("fetchServicesBySalon response:", response.data);
     return response.data || [];
   } catch (error) {
     const errorMessage = error.response
@@ -68,6 +70,7 @@ export const fetchServiceById = async (serviceId) => {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       }
     );
+    console.log("fetchServiceById response:", response.data);
     return response.data;
   } catch (error) {
     const errorMessage = error.response
@@ -80,7 +83,7 @@ export const fetchServiceById = async (serviceId) => {
   }
 };
 
-export const fetchAvailableSlots = async (salonId, date) => {
+export const fetchBookedSlots = async (salonId, date) => {
   if (!salonId || !date) throw new Error("Thiếu salonId hoặc date");
   try {
     const response = await axios.get(
@@ -89,13 +92,42 @@ export const fetchAvailableSlots = async (salonId, date) => {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       }
     );
-    return response.data || [];
+    const data = response.data || [];
+    console.log(`fetchBookedSlots for salon ${salonId}, date ${date}:`, data);
+    const validData = data.filter((slot) => {
+      const isValid =
+        slot.startTime &&
+        slot.endTime &&
+        slot.staffId &&
+        /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.test(
+          slot.startTime
+        ) &&
+        /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.test(
+          slot.endTime
+        ) &&
+        new Date(slot.startTime) < new Date(slot.endTime);
+      if (!isValid) {
+        console.warn("Invalid booked slot:", slot);
+      }
+      return isValid;
+    });
+    validData.forEach((slot) => {
+      console.log(
+        `Parsed slot: start=${new Date(slot.startTime).toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+        })}, end=${new Date(slot.endTime).toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+        })}, staffId=${slot.staffId}`
+      );
+    });
+    return validData;
   } catch (error) {
     const errorMessage = error.response
       ? `Lỗi server: ${error.response.status} - ${
           error.response.data.message || error.message
         }`
-      : `Không kết nối được dịch vụ lịch trống: ${error.message}`;
+      : `Không kết nối được dịch vụ lịch đã đặt: ${error.message}`;
+    console.error("fetchBookedSlots error:", errorMessage);
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }
@@ -133,6 +165,7 @@ export const createBooking = async (salonId, customerId, bookingRequest) => {
         },
       }
     );
+    console.log("createBooking response:", response.data);
     return response.data;
   } catch (error) {
     const errorMessage = error.response
@@ -151,6 +184,7 @@ export const fetchSalonById = async (salonId) => {
     const response = await axios.get(`${API_BASE_URL}:8084/salon/${salonId}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
+    console.log("fetchSalonById response:", response.data);
     return response.data;
   } catch (error) {
     const errorMessage = error.response
@@ -168,6 +202,7 @@ export const fetchSalons = async () => {
     const response = await axios.get(`${API_BASE_URL}:8084/salon`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
+    console.log("fetchSalons response:", response.data);
     return response.data || [];
   } catch (error) {
     const errorMessage = error.response
@@ -204,6 +239,7 @@ export const createPaymentLink = async (user, booking, paymentMethod) => {
         },
       }
     );
+    console.log("createPaymentLink response:", response.data);
     return { paymentLinkUrl: response.data.payment_link_url };
   } catch (error) {
     const errorMessage = error.response
@@ -224,13 +260,17 @@ export const proceedPayment = async (paymentOrderId) => {
       null,
       {
         params: { paymentOrderId },
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
       }
     );
     return response;
   };
   try {
     const response = await retry(request, 3, 1000);
+    console.log("proceedPayment response:", response.data);
     return response.data === true;
   } catch (error) {
     const errorMessage = error.response
@@ -238,6 +278,7 @@ export const proceedPayment = async (paymentOrderId) => {
           error.response.data.message || error.message
         }`
       : `Không kết nối được payment service: ${error.message}`;
+    console.error("proceedPayment error:", errorMessage);
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }
