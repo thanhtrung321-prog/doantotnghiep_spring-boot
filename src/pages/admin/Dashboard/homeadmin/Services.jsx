@@ -30,6 +30,9 @@ const Services = () => {
   const [displayMode, setDisplayMode] = useState("slider");
   const threeContainer = useRef(null);
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState(null);
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -277,15 +280,21 @@ const Services = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Bạn có chắc muốn xóa dịch vụ này không?")) {
-      try {
-        await deleteService(id);
-        setServices(services.filter((s) => s.id !== id));
-        toast.success("Dịch vụ đã được xóa thành công!");
-      } catch (error) {
-        toast.error(error.message);
-      }
+  const handleDelete = (id) => {
+    setSelectedServiceId(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteService(selectedServiceId);
+      setServices(services.filter((s) => s.id !== selectedServiceId));
+      toast.success("Dịch vụ đã được xóa thành công!");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedServiceId(null);
     }
   };
 
@@ -745,6 +754,57 @@ const Services = () => {
             >
               Đóng
             </button>
+          </div>
+        </div>
+      )}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 rounded-2xl ">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full text-black">
+            <h2
+              className="text-2xl font-bold mb-4"
+              style={{ color: "rgb(255, 99, 132)" }}
+            >
+              Xác nhận xoá
+            </h2>
+            <p className="text-lg" style={{ color: "rgb(75, 85, 99)" }}>
+              Bạn có chắc chắn muốn xoá dịch vụ này không?
+            </p>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
+              >
+                <h2>
+                  {"Xác nhận xoá".split(" ").map((word, index) => {
+                    const colors = [
+                      "rgb(255, 99, 132)",
+                      "rgb(54, 162, 235)",
+                      "rgb(255, 205, 86)",
+                      "rgb(75, 192, 192)",
+                    ];
+                    return (
+                      <span
+                        key={index}
+                        style={{
+                          color: colors[index % colors.length],
+                          marginRight: "0.5rem",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {word}
+                      </span>
+                    );
+                  })}
+                </h2>
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 cursor-pointer"
+              >
+                Hủy
+              </button>
+            </div>
           </div>
         </div>
       )}
