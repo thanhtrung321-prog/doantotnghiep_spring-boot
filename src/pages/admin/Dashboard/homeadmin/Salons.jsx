@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import {
   Search,
   Filter,
@@ -18,31 +16,72 @@ import {
   List,
   Home,
   X,
+  Image,
 } from "lucide-react";
 import TimePicker from "react-time-picker";
 import "react-time-picker/dist/TimePicker.css";
+import axios from "axios";
 import {
   getAllSalons,
   createSalon,
   updateSalon,
-  getSalonById,
+  deleteSalon,
+  getOwners,
+  getOwnerById,
 } from "../../api/apiadmin/salonmanager";
 
 const Salons = () => {
+  // modal states
+  const [isModalOpen, setModalOpen] = useState(false);
+  // end  modal states
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState("grid");
   const [salons, setSalons] = useState([]);
+  const [filteredSalons, setFilteredSalons] = useState([]);
   const [selectedSalon, setSelectedSalon] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
   const [formErrors, setFormErrors] = useState({});
+  const [owners, setOwners] = useState([]);
+  const [selectedOwner, setSelectedOwner] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [editImagePreviews, setEditImagePreviews] = useState([]);
+  const [editImages, setEditImages] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [districtName, setDistrictName] = useState("");
+  const [wardName, setWardName] = useState("");
+  const salonsPerPage = 3;
 
   const user = JSON.parse(localStorage.getItem("user")) || {};
   const navigate = useNavigate();
+
+  const [newSalonData, setNewSalonData] = useState({
+    name: "",
+    addressDetail: "",
+    city: "",
+    provinceId: "",
+    districtId: "",
+    wardId: "",
+    openingTime: "08:00",
+    closingTime: "20:00",
+    contact: "",
+    email: "",
+    ownerId: "",
+    images: [],
+  });
 
   useEffect(() => {
     if (!user.id) {
@@ -52,163 +91,140 @@ const Salons = () => {
     }
   }, [user.id, navigate]);
 
-  const [newSalonData, setNewSalonData] = useState({
-    name: "",
-    address: "",
-    city: "",
-    openingTime: "09:00",
-    closingTime: "21:00",
-    contact: "",
-    email: "",
-    ownerId: user.id || 1,
-    images: [],
-  });
-  const [imagePreviews, setImagePreviews] = useState([]); // Stores temporary URLs for image previews
-
-  const threeContainerRef = useRef(null);
-  const sceneRef = useRef(null);
-  const cameraRef = useRef(null);
-  const rendererRef = useRef(null);
-  const cubesRef = useRef([]);
+  useEffect(() => {
+    const fetchProvinces = async () => {
+      try {
+        const response = await axios.get(
+          "https://esgoo.net/api-tinhthanh/1/0.htm"
+        );
+        if (response.data.error === 0) setProvinces(response.data.data);
+      } catch (error) {
+        setModalMessage("Failed to fetch provinces.");
+        setIsErrorModalOpen(true);
+      }
+    };
+    fetchProvinces();
+  }, []);
 
   useEffect(() => {
-    const fetchSalons = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const data = await getAllSalons();
-        setSalons(data);
+        const [salonData, ownerData] = await Promise.all([
+          getAllSalons(),
+          getOwners(),
+        ]);
+        setSalons(salonData);
+        setFilteredSalons(salonData);
+        setOwners(ownerData);
       } catch (error) {
-        setModalMessage("Failed to fetch salons. Please try again.");
+        setModalMessage("Failed to fetch data.");
         setIsErrorModalOpen(true);
       } finally {
         setIsLoading(false);
       }
     };
-    if (user.id) fetchSalons();
+    if (user.id) fetchData();
   }, [user.id]);
 
-  useEffect(() => {
-    if (!threeContainerRef.current) return;
-    const width = threeContainerRef.current.clientWidth;
-    const height = threeContainerRef.current.clientHeight;
-
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.z = 15;
-    cameraRef.current = camera;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0);
-    threeContainerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.enableZoom = false;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.5;
-
-    const ambientLight = new THREE.AmbientLight(0x404040, 2);
-    scene.add(ambientLight);
-
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight1.position.set(1, 1, 1);
-    scene.add(directionalLight1);
-
-    const directionalLight2 = new THREE.DirectionalLight(0x6d28d9, 1);
-    directionalLight2.position.set(-1, -1, -1);
-    scene.add(directionalLight2);
-
-    cubesRef.current = [];
-    const colors = [0x6d28d9, 0x8b5cf6, 0xa78bfa, 0xc4b5fd];
-
-    for (let i = 0; i < 40; i++) {
-      const size = Math.random() * 0.5 + 0.1;
-      const geometry = new THREE.BoxGeometry(size, size, size);
-      const colorIndex = Math.floor(Math.random() * colors.length);
-      const material = new THREE.MeshPhongMaterial({
-        color: colors[colorIndex],
-        transparent: true,
-        opacity: 0.7,
-        shininess: 100,
-      });
-      const cube = new THREE.Mesh(geometry, material);
-
-      const radius = 10;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.random() * Math.PI;
-
-      cube.position.x = radius * Math.sin(phi) * Math.cos(theta);
-      cube.position.y = radius * Math.sin(phi) * Math.sin(theta);
-      cube.position.z = radius * Math.cos(phi);
-      cube.userData.originalPosition = cube.position.clone();
-
-      cube.userData.rotationSpeed = {
-        x: (Math.random() - 0.5) * 0.02,
-        y: (Math.random() - 0.5) * 0.02,
-        z: (Math.random() - 0.5) * 0.02,
-      };
-
-      scene.add(cube);
-      cubesRef.current.push(cube);
-    }
-
-    const animate = (time) => {
-      requestAnimationFrame(animate);
-
-      cubesRef.current.forEach((cube, i) => {
-        cube.rotation.x += cube.userData.rotationSpeed.x;
-        cube.rotation.y += cube.userData.rotationSpeed.y;
-        cube.rotation.z += cube.userData.rotationSpeed.z;
-
-        const offset = i * 0.1;
-        const amplitude = 0.1;
-        cube.position.x =
-          cube.userData.originalPosition.x +
-          Math.sin(time * 0.01 + offset) * amplitude;
-        cube.position.y =
-          cube.userData.originalPosition.y +
-          Math.cos(time * 0.01 + offset) * amplitude;
-      });
-
-      controls.update();
-      renderer.render(scene, camera);
-    };
-
-    animate(0);
-
-    const handleResize = () => {
-      if (!threeContainerRef.current) return;
-      const width = threeContainerRef.current.clientWidth;
-      const height = threeContainerRef.current.clientHeight;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (threeContainerRef.current && rendererRef.current) {
-        threeContainerRef.current.removeChild(rendererRef.current.domElement);
+  const handleProvinceChange = async (provinceId) => {
+    const selectedProvince = provinces.find((p) => p.id === provinceId);
+    setNewSalonData({
+      ...newSalonData,
+      provinceId,
+      city: selectedProvince ? selectedProvince.full_name : "",
+      districtId: "",
+      wardId: "",
+      addressDetail: "",
+    });
+    setDistrictName("");
+    setWardName("");
+    setDistricts([]);
+    setWards([]);
+    if (provinceId) {
+      try {
+        const response = await axios.get(
+          `https://esgoo.net/api-tinhthanh/2/${provinceId}.htm`
+        );
+        if (response.data.error === 0) setDistricts(response.data.data);
+      } catch (error) {
+        setModalMessage("Failed to fetch districts.");
+        setIsErrorModalOpen(true);
       }
-      cubesRef.current.forEach((cube) => {
-        if (cube.geometry) cube.geometry.dispose();
-        if (cube.material) cube.material.dispose();
-      });
-    };
-  }, []);
+    }
+  };
+
+  const handleDistrictChange = async (districtId) => {
+    const selectedDistrict = districts.find((d) => d.id === districtId);
+    setDistrictName(selectedDistrict ? selectedDistrict.full_name : "");
+    setNewSalonData({
+      ...newSalonData,
+      districtId,
+      wardId: "",
+      addressDetail: "",
+    });
+    setWardName("");
+    setWards([]);
+    if (districtId) {
+      try {
+        const response = await axios.get(
+          `https://esgoo.net/api-tinhthanh/3/${districtId}.htm`
+        );
+        if (response.data.error === 0) setWards(response.data.data);
+      } catch (error) {
+        setModalMessage("Failed to fetch wards.");
+        setIsErrorModalOpen(true);
+      }
+    }
+  };
+
+  const handleWardChange = (wardId) => {
+    const selectedWard = wards.find((w) => w.id === wardId);
+    setWardName(selectedWard ? selectedWard.full_name : "");
+    setNewSalonData({
+      ...newSalonData,
+      wardId,
+      addressDetail: "",
+    });
+  };
+
+  useEffect(() => {
+    let result = [...salons];
+    if (searchQuery) {
+      result = result.filter(
+        (salon) =>
+          salon.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          salon.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          salon.city.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    result.sort((a, b) => (sortOrder === "asc" ? a.id - b.id : b.id - a.id));
+    setFilteredSalons(result);
+    setCurrentPage(1);
+  }, [searchQuery, sortOrder, salons]);
+
+  const indexOfLastSalon = currentPage * salonsPerPage;
+  const indexOfFirstSalon = indexOfLastSalon - salonsPerPage;
+  const currentSalons = filteredSalons.slice(
+    indexOfFirstSalon,
+    indexOfLastSalon
+  );
+  const totalPages = Math.ceil(filteredSalons.length / salonsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const handleSort = () => setSortOrder(sortOrder === "asc" ? "desc" : "asc");
 
   const validateForm = () => {
     const errors = {};
     if (!newSalonData.name.trim()) errors.name = "Tên salon là bắt buộc";
-    if (!newSalonData.address.trim()) errors.address = "Địa chỉ là bắt buộc";
-    if (!newSalonData.city.trim()) errors.city = "Thành phố là bắt buộc";
+    if (!newSalonData.addressDetail.trim())
+      errors.addressDetail = "Địa chỉ chi tiết là bắt buộc";
+    if (!newSalonData.city.trim()) errors.city = "Tỉnh/Thành phố là bắt buộc";
+    if (!newSalonData.provinceId)
+      errors.provinceId = "Tỉnh/Thành phố là bắt buộc";
+    if (!newSalonData.districtId) errors.districtId = "Quận/Huyện là bắt buộc";
+    if (!newSalonData.wardId) errors.wardId = "Phường/Xã là bắt buộc";
     if (!newSalonData.openingTime)
       errors.openingTime = "Giờ mở cửa là bắt buộc";
     if (!newSalonData.closingTime)
@@ -229,52 +245,58 @@ const Salons = () => {
       setFormErrors(errors);
       return;
     }
-
     try {
+      const fullAddress = [
+        newSalonData.city,
+        districtName,
+        wardName,
+        newSalonData.addressDetail,
+      ].join("|");
+
       const salonData = {
         name: newSalonData.name,
-        address: newSalonData.address,
+        address: fullAddress,
         city: newSalonData.city,
-        openingTime: newSalonData.openingTime,
-        closingTime: newSalonData.closingTime,
+        provinceId: newSalonData.provinceId,
+        districtId: newSalonData.districtId,
+        wardId: newSalonData.wardId,
+        openingTime: newSalonData.openingTime + ":00",
+        closingTime: newSalonData.closingTime + ":00",
         contact: newSalonData.contact,
         email: newSalonData.email,
-        ownerId: newSalonData.ownerId,
-        images:
-          newSalonData.images.length > 0
-            ? newSalonData.images
-            : ["image1.jpg", "image2.jpg"],
+        ownerId: parseInt(newSalonData.ownerId),
+        images: newSalonData.images.length > 0 ? newSalonData.images : [],
       };
-
       const createdSalon = await createSalon(salonData);
       setSalons((prev) => [...prev, createdSalon]);
       setIsAddModalOpen(false);
       setNewSalonData({
         name: "",
-        address: "",
+        addressDetail: "",
         city: "",
-        openingTime: "09:00",
-        closingTime: "21:00",
+        provinceId: "",
+        districtId: "",
+        wardId: "",
+        openingTime: "08:00",
+        closingTime: "20:00",
         contact: "",
         email: "",
-        ownerId: user.id || 1,
+        ownerId: "",
         images: [],
       });
+      setDistrictName("");
+      setWardName("");
       setImagePreviews([]);
       setFormErrors({});
       setModalMessage("Salon added successfully!");
       setIsSuccessModalOpen(true);
     } catch (error) {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to add salon. Please try again.";
-      setModalMessage(errorMessage);
+      setModalMessage(error.response?.data?.message || "Failed to add salon.");
       setIsErrorModalOpen(true);
     }
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = (e, isEdit = false) => {
     const files = Array.from(e.target.files);
     const imageNames = files.map((file) => file.name);
     const previews = files.map((file) => {
@@ -284,19 +306,39 @@ const Salons = () => {
         reader.readAsDataURL(file);
       });
     });
-
     Promise.all(previews).then((previewUrls) => {
-      setNewSalonData({ ...newSalonData, images: imageNames });
-      setImagePreviews(previewUrls);
+      if (isEdit) {
+        setEditImages([...editImages, ...imageNames]);
+        setEditImagePreviews([...editImagePreviews, ...previewUrls]);
+        setSelectedSalon({
+          ...selectedSalon,
+          images: [...selectedSalon.images, ...imageNames],
+        });
+      } else {
+        setNewSalonData({
+          ...newSalonData,
+          images: [...newSalonData.images, ...imageNames],
+        });
+        setImagePreviews([...imagePreviews, ...previewUrls]);
+      }
     });
   };
 
-  const handleRemoveImage = (index) => {
-    setNewSalonData({
-      ...newSalonData,
-      images: newSalonData.images.filter((_, i) => i !== index),
-    });
-    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+  const handleRemoveImage = (index, isEdit = false) => {
+    if (isEdit) {
+      setEditImages(editImages.filter((_, i) => i !== index));
+      setEditImagePreviews(editImagePreviews.filter((_, i) => i !== index));
+      setSelectedSalon({
+        ...selectedSalon,
+        images: selectedSalon.images.filter((_, i) => i !== index),
+      });
+    } else {
+      setNewSalonData({
+        ...newSalonData,
+        images: newSalonData.images.filter((_, i) => i !== index),
+      });
+      setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+    }
   };
 
   const handleViewDetails = (salon) => {
@@ -306,35 +348,97 @@ const Salons = () => {
 
   const handleEditSalon = async () => {
     try {
-      const updatedSalon = await updateSalon(selectedSalon.id, selectedSalon);
+      const selectedProvince = provinces.find(
+        (p) => p.id === selectedSalon.provinceId
+      );
+      const openingTime = selectedSalon.openingTime.includes(":")
+        ? selectedSalon.openingTime
+        : selectedSalon.openingTime + ":00";
+      const closingTime = selectedSalon.closingTime.includes(":")
+        ? selectedSalon.closingTime
+        : selectedSalon.closingTime + ":00";
+
+      const fullAddress = [
+        selectedProvince ? selectedProvince.full_name : selectedSalon.city,
+        districtName || selectedSalon.districtName || "",
+        wardName || selectedSalon.wardName || "",
+        selectedSalon.addressDetail ||
+          selectedSalon.address.split("|")[3] ||
+          "",
+      ].join("|");
+
+      const salonData = {
+        name: selectedSalon.name,
+        address: fullAddress,
+        city: selectedProvince
+          ? selectedProvince.full_name
+          : selectedSalon.city,
+        provinceId: selectedSalon.provinceId,
+        districtId: selectedSalon.districtId,
+        wardId: selectedSalon.wardId,
+        openingTime,
+        closingTime,
+        contact: selectedSalon.contact,
+        email: selectedSalon.email,
+        ownerId: parseInt(selectedSalon.ownerId),
+        images: selectedSalon.images || [],
+      };
+      const updatedSalon = await updateSalon(selectedSalon.id, salonData);
       setSalons((prev) =>
         prev.map((salon) =>
           salon.id === updatedSalon.id ? updatedSalon : salon
         )
       );
       setIsEditModalOpen(false);
+      setEditImagePreviews([]);
+      setEditImages([]);
       setModalMessage("Salon updated successfully!");
       setIsSuccessModalOpen(true);
     } catch (error) {
-      setModalMessage("Failed to update salon. Please try again.");
+      setModalMessage("Failed to update salon.");
       setIsErrorModalOpen(true);
     }
   };
 
-  const handleDeleteSalon = (id) => {
-    setSalons((prev) => prev.filter((salon) => salon.id !== id));
-    setModalMessage("Salon deleted successfully!");
-    setIsSuccessModalOpen(true);
+  const handleDeleteSalon = async () => {
+    try {
+      await deleteSalon(selectedSalon.id);
+      setSalons((prev) =>
+        prev.filter((salon) => salon.id !== selectedSalon.id)
+      );
+      setIsDeleteModalOpen(false);
+      setIsDetailModalOpen(false);
+      setModalMessage("Salon deleted successfully!");
+      setIsSuccessModalOpen(true);
+    } catch (error) {
+      setModalMessage("Failed to delete salon.");
+      setIsErrorModalOpen(true);
+    }
   };
+
+  const handleViewOwnerInfo = async () => {
+    try {
+      const ownerData = await getOwnerById(selectedSalon.ownerId);
+      setSelectedOwner(ownerData);
+      setIsOwnerModalOpen(true);
+    } catch (error) {
+      setModalMessage("Failed to fetch owner information.");
+      setIsErrorModalOpen(true);
+    }
+  };
+
+  const handleViewImage = (index) => {
+    setSelectedImageIndex(index);
+    setIsImageModalOpen(true);
+  };
+  const displayFullAddress = (address) => {
+    return (address ?? "").split("|").filter(Boolean).join(", ");
+  };
+
+  const fullAddress = displayFullAddress(selectedSalon?.address);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-900 text-white">
-      <div
-        ref={threeContainerRef}
-        className="fixed inset-0 -z-10"
-        aria-hidden="true"
-      />
-
       {isLoading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900">
           <div className="space-y-6 text-center">
@@ -369,9 +473,39 @@ const Salons = () => {
             <input
               type="text"
               placeholder="Tìm kiếm salon theo tên, địa chỉ..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-4 py-2 w-full bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-lg"
-              aria-label="Tìm kiếm salon"
             />
+            {searchQuery && filteredSalons.length > 0 && (
+              <div className="absolute top-full left-0 w-full bg-gray-800/90 rounded-lg mt-1 max-h-60 overflow-y-auto z-10">
+                {filteredSalons.map((salon) => (
+                  <div
+                    key={salon.id}
+                    className="flex items-center p-2 border-b border-gray-700/50 hover:bg-gray-700/50 cursor-pointer"
+                    onClick={() => handleViewDetails(salon)}
+                  >
+                    <img
+                      src={
+                        salon.images && salon.images.length > 0
+                          ? `http://localhost:8084/salon-images/${salon.images[0]}`
+                          : "/api/placeholder/50/50"
+                      }
+                      alt={salon.name}
+                      className="w-12 h-12 object-cover rounded-lg mr-2"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {salon.name}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {displayFullAddress(salon.address)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -383,7 +517,6 @@ const Salons = () => {
                     : "bg-gray-800/50 text-gray-300"
                 }`}
                 onClick={() => setViewMode("grid")}
-                aria-label="Chế độ xem lưới"
               >
                 <Grid className="h-5 w-5" />
               </button>
@@ -394,15 +527,17 @@ const Salons = () => {
                     : "bg-gray-800/50 text-gray-300"
                 }`}
                 onClick={() => setViewMode("list")}
-                aria-label="Chế độ xem danh sách"
               >
                 <List className="h-5 w-5" />
               </button>
             </div>
 
-            <button className="flex items-center px-4 py-2 bg-gray-800/50 text-white rounded-lg hover:bg-gray-700/50 transition-colors backdrop-blur-lg border border-gray-700/30">
+            <button
+              onClick={handleSort}
+              className="flex items-center px-4 py-2 bg-gray-800/50 text-white rounded-lg hover:bg-gray-700/50 transition-colors backdrop-blur-lg border border-gray-700/30"
+            >
               <Filter className="h-5 w-5 mr-2" />
-              Lọc
+              Sắp xếp theo ID ({sortOrder === "asc" ? "Tăng" : "Giảm"})
               <ChevronDown className="h-4 w-4 ml-2" />
             </button>
 
@@ -419,7 +554,7 @@ const Salons = () => {
 
         {viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {salons.map((salon) => (
+            {currentSalons.map((salon) => (
               <div
                 key={salon.id}
                 className="group bg-gray-800/30 backdrop-blur-md rounded-xl overflow-hidden border border-gray-700/30 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
@@ -432,10 +567,12 @@ const Salons = () => {
                         : "/api/placeholder/600/400"
                     }
                     alt={salon.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    loading="lazy"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 cursor-pointer"
+                    onClick={() => {
+                      setSelectedSalon(salon);
+                      handleViewImage(0);
+                    }}
                   />
-
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-80"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-4">
                     <h2 className="text-xl font-bold text-white">
@@ -444,7 +581,7 @@ const Salons = () => {
                     <div className="flex items-center mt-1 text-gray-300">
                       <MapPin className="h-4 w-4 flex-shrink-0" />
                       <span className="ml-1 text-sm truncate">
-                        {salon.address}, {salon.city}
+                        {displayFullAddress(salon.address)}
                       </span>
                     </div>
                   </div>
@@ -457,17 +594,14 @@ const Salons = () => {
                       {salon.openingTime} - {salon.closingTime}
                     </span>
                   </div>
-
                   <div className="flex items-center text-gray-300">
                     <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     <span className="ml-2 text-sm">{salon.contact}</span>
                   </div>
-
                   <div className="flex items-center text-gray-300">
                     <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     <span className="ml-2 text-sm truncate">{salon.email}</span>
                   </div>
-
                   <div className="pt-2 flex justify-end space-x-2">
                     <button
                       onClick={() => handleViewDetails(salon)}
@@ -485,7 +619,10 @@ const Salons = () => {
                       <Edit className="h-5 w-5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteSalon(salon.id)}
+                      onClick={() => {
+                        setSelectedSalon(salon);
+                        setIsDeleteModalOpen(true);
+                      }}
                       className="p-1 text-red-400 hover:text-red-300"
                     >
                       <Trash2 className="h-5 w-5" />
@@ -512,6 +649,9 @@ const Salons = () => {
                         Địa chỉ
                       </th>
                       <th className="py-3 px-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Tỉnh/Thành phố
+                      </th>
+                      <th className="py-3 px-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                         Giờ mở cửa
                       </th>
                       <th className="py-3 px-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -526,7 +666,7 @@ const Salons = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-gray-800/30 divide-y divide-gray-800/50">
-                    {salons.map((salon) => (
+                    {currentSalons.map((salon) => (
                       <tr
                         key={salon.id}
                         className="hover:bg-gray-700/30 transition-colors"
@@ -540,10 +680,11 @@ const Salons = () => {
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
                           <div className="flex items-center">
                             <MapPin className="h-4 w-4 mr-1 text-gray-400" />
-                            <span>
-                              {salon.address}, {salon.city}
-                            </span>
+                            <span>{displayFullAddress(salon.address)}</span>
                           </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
+                          {salon.city}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
                           <div className="flex items-center">
@@ -583,7 +724,10 @@ const Salons = () => {
                               <Edit className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteSalon(salon.id)}
+                              onClick={() => {
+                                setSelectedSalon(salon);
+                                setIsDeleteModalOpen(true);
+                              }}
                               className="text-red-400 hover:text-red-300"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -602,22 +746,36 @@ const Salons = () => {
         <div className="flex items-center justify-between mt-6">
           <div className="text-sm text-gray-400">
             Hiển thị{" "}
-            <span className="font-medium text-white">{salons.length}</span>{" "}
+            <span className="font-medium text-white">
+              {filteredSalons.length}
+            </span>{" "}
             salon
           </div>
           <div className="flex space-x-2">
             <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
               className="px-4 py-2 bg-gray-800/50 text-white rounded-lg border border-gray-700/50 hover:bg-gray-700/50 transition-colors backdrop-blur-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled
             >
               Trước
             </button>
-            <button className="px-4 py-2 bg-purple-600/70 text-white rounded-lg border border-purple-500/50 hover:bg-purple-500/70 transition-colors backdrop-blur-lg">
-              1
-            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => paginate(page)}
+                className={`px-4 py-2 ${
+                  currentPage === page
+                    ? "bg-purple-600/70 text-white"
+                    : "bg-gray-800/50 text-white"
+                } rounded-lg border border-gray-700/50 hover:bg-gray-700/50 transition-colors backdrop-blur-lg`}
+              >
+                {page}
+              </button>
+            ))}
             <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
               className="px-4 py-2 bg-gray-800/50 text-white rounded-lg border border-gray-700/50 hover:bg-gray-700/50 transition-colors backdrop-blur-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled
             >
               Sau
             </button>
@@ -626,8 +784,8 @@ const Salons = () => {
       </div>
 
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-4xl rounded-xl shadow-2xl border border-gray-800 p-6">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center overflow-x-auto">
+          <div className="bg-gradient-to-br from-gray-900 to-indigo-900 w-full max-w-5xl min-w-[90%] rounded-2xl shadow-2xl border border-gray-800 p-8 m-4">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">
                 Thêm Salon Mới
@@ -643,9 +801,9 @@ const Salons = () => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <form onSubmit={handleAddSalon} className="space-y-6 ">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
+            <form onSubmit={handleAddSalon} className="space-y-6">
+              <div className="flex flex-wrap gap-6">
+                <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Tên salon
                   </label>
@@ -667,54 +825,113 @@ const Salons = () => {
                     </p>
                   )}
                 </div>
-                <div>
+                <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Thành phố
+                    Tỉnh/Thành phố
                   </label>
-                  <input
-                    type="text"
-                    value={newSalonData.city}
-                    onChange={(e) =>
-                      setNewSalonData({ ...newSalonData, city: e.target.value })
-                    }
+                  <select
+                    value={newSalonData.provinceId}
+                    onChange={(e) => handleProvinceChange(e.target.value)}
                     className={`w-full px-4 py-2 bg-gray-800/50 border ${
                       formErrors.city ? "border-red-500" : "border-gray-700"
-                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
-                    placeholder="Nhập thành phố"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     required
-                  />
+                  >
+                    <option value="">Chọn Tỉnh/Thành phố</option>
+                    {provinces.map((province) => (
+                      <option key={province.id} value={province.id}>
+                        {province.full_name}
+                      </option>
+                    ))}
+                  </select>
                   {formErrors.city && (
                     <p className="text-red-500 text-xs mt-1">
                       {formErrors.city}
                     </p>
                   )}
                 </div>
-                <div className="md:col-span-2">
+                <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Địa chỉ
+                    Quận/Huyện
                   </label>
-                  <input
-                    type="text"
-                    value={newSalonData.address}
-                    onChange={(e) =>
-                      setNewSalonData({
-                        ...newSalonData,
-                        address: e.target.value,
-                      })
-                    }
+                  <select
+                    value={newSalonData.districtId}
+                    onChange={(e) => handleDistrictChange(e.target.value)}
                     className={`w-full px-4 py-2 bg-gray-800/50 border ${
-                      formErrors.address ? "border-red-500" : "border-gray-700"
-                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
-                    placeholder="Nhập địa chỉ"
+                      formErrors.districtId
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     required
-                  />
-                  {formErrors.address && (
+                    disabled={!newSalonData.provinceId}
+                  >
+                    <option value="">Chọn Quận/Huyện</option>
+                    {districts.map((district) => (
+                      <option key={district.id} value={district.id}>
+                        {district.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.districtId && (
                     <p className="text-red-500 text-xs mt-1">
-                      {formErrors.address}
+                      {formErrors.districtId}
                     </p>
                   )}
                 </div>
-                <div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Phường/Xã
+                  </label>
+                  <select
+                    value={newSalonData.wardId}
+                    onChange={(e) => handleWardChange(e.target.value)}
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.wardId ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    required
+                    disabled={!newSalonData.districtId}
+                  >
+                    <option value="">Chọn Phường/Xã</option>
+                    {wards.map((ward) => (
+                      <option key={ward.id} value={ward.id}>
+                        {ward.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.wardId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.wardId}
+                    </p>
+                  )}
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Địa chỉ chi tiết
+                  </label>
+                  <input
+                    type="text"
+                    value={newSalonData.addressDetail}
+                    onChange={(e) =>
+                      setNewSalonData({
+                        ...newSalonData,
+                        addressDetail: e.target.value,
+                      })
+                    }
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.addressDetail
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    placeholder="Nhập số nhà, đường"
+                    required
+                  />
+                  {formErrors.addressDetail && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.addressDetail}
+                    </p>
+                  )}
+                </div>
+                <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Giờ mở cửa
                   </label>
@@ -722,7 +939,7 @@ const Salons = () => {
                     onChange={(value) =>
                       setNewSalonData({
                         ...newSalonData,
-                        openingTime: value || "09:00",
+                        openingTime: value || "08:00",
                       })
                     }
                     value={newSalonData.openingTime}
@@ -741,7 +958,7 @@ const Salons = () => {
                     </p>
                   )}
                 </div>
-                <div>
+                <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Giờ đóng cửa
                   </label>
@@ -749,7 +966,7 @@ const Salons = () => {
                     onChange={(value) =>
                       setNewSalonData({
                         ...newSalonData,
-                        closingTime: value || "21:00",
+                        closingTime: value || "20:00",
                       })
                     }
                     value={newSalonData.closingTime}
@@ -768,7 +985,7 @@ const Salons = () => {
                     </p>
                   )}
                 </div>
-                <div>
+                <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Số điện thoại
                   </label>
@@ -793,7 +1010,7 @@ const Salons = () => {
                     </p>
                   )}
                 </div>
-                <div>
+                <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Email
                   </label>
@@ -818,7 +1035,37 @@ const Salons = () => {
                     </p>
                   )}
                 </div>
-                <div className="md:col-span-2">
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Chủ salon
+                  </label>
+                  <select
+                    value={newSalonData.ownerId}
+                    onChange={(e) =>
+                      setNewSalonData({
+                        ...newSalonData,
+                        ownerId: e.target.value,
+                      })
+                    }
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.ownerId ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
+                    required
+                  >
+                    <option value="">Chọn chủ salon</option>
+                    {owners.map((owner) => (
+                      <option key={owner.id} value={owner.id}>
+                        {owner.fullName} ({owner.email})
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.ownerId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.ownerId}
+                    </p>
+                  )}
+                </div>
+                <div className="w-full">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Hình ảnh
                   </label>
@@ -842,7 +1089,6 @@ const Salons = () => {
                             type="button"
                             onClick={() => handleRemoveImage(index)}
                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
-                            title="Xóa hình ảnh"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -857,7 +1103,7 @@ const Salons = () => {
                   )}
                 </div>
               </div>
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
                   onClick={() => {
@@ -882,133 +1128,319 @@ const Salons = () => {
       )}
 
       {isEditModalOpen && selectedSalon && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl border border-gray-800 p-6">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center overflow-x-auto">
+          <div className="bg-gradient-to-br from-gray-900 to-indigo-900 w-full max-w-5xl min-w-[90%] rounded-2xl shadow-2xl border border-gray-800 p-8 m-4">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">
                 Chỉnh sửa Salon
               </h3>
               <button
-                onClick={() => setIsEditModalOpen(false)}
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditImagePreviews([]);
+                  setEditImages([]);
+                }}
                 className="text-gray-400 hover:text-white transition"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Tên salon
-                </label>
-                <input
-                  type="text"
-                  value={selectedSalon.name}
-                  onChange={(e) =>
-                    setSelectedSalon({ ...selectedSalon, name: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
-                />
+              <div className="flex flex-wrap gap-6">
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Tên salon
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedSalon.name}
+                    onChange={(e) =>
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        name: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                  />
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Tỉnh/Thành phố
+                  </label>
+                  <select
+                    value={selectedSalon.provinceId}
+                    onChange={(e) => {
+                      const selectedProvince = provinces.find(
+                        (p) => p.id === e.target.value
+                      );
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        provinceId: e.target.value,
+                        city: selectedProvince
+                          ? selectedProvince.full_name
+                          : "",
+                        districtId: "",
+                        wardId: "",
+                        addressDetail: "",
+                      });
+                      setDistrictName("");
+                      setWardName("");
+                      handleProvinceChange(e.target.value);
+                    }}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                  >
+                    <option value="">Chọn Tỉnh/Thành phố</option>
+                    {provinces.map((province) => (
+                      <option key={province.id} value={province.id}>
+                        {province.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Quận/Huyện
+                  </label>
+                  <select
+                    value={selectedSalon.districtId}
+                    onChange={(e) => {
+                      const selectedDistrict = districts.find(
+                        (d) => d.id === e.target.value
+                      );
+                      setDistrictName(
+                        selectedDistrict ? selectedDistrict.full_name : ""
+                      );
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        districtId: e.target.value,
+                        wardId: "",
+                        addressDetail: "",
+                      });
+                      setWardName("");
+                      handleDistrictChange(e.target.value);
+                    }}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    disabled={!selectedSalon.provinceId}
+                  >
+                    <option value="">Chọn Quận/Huyện</option>
+                    {districts.map((district) => (
+                      <option key={district.id} value={district.id}>
+                        {district.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Phường/Xã
+                  </label>
+                  <select
+                    value={selectedSalon.wardId}
+                    onChange={(e) => {
+                      const selectedWard = wards.find(
+                        (w) => w.id === e.target.value
+                      );
+                      setWardName(selectedWard ? selectedWard.full_name : "");
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        wardId: e.target.value,
+                        addressDetail: "",
+                      });
+                    }}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    disabled={!selectedSalon.districtId}
+                  >
+                    <option value="">Chọn Phường/Xã</option>
+                    {wards.map((ward) => (
+                      <option key={ward.id} value={ward.id}>
+                        {ward.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Địa chỉ chi tiết
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      selectedSalon.addressDetail ||
+                      selectedSalon.address.split("|")[3] ||
+                      ""
+                    }
+                    onChange={(e) =>
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        addressDetail: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    placeholder="Nhập số nhà, đường"
+                  />
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Giờ mở cửa
+                  </label>
+                  <TimePicker
+                    onChange={(value) =>
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        openingTime: value || "08:00",
+                      })
+                    }
+                    value={selectedSalon.openingTime
+                      .split(":")
+                      .slice(0, 2)
+                      .join(":")}
+                    format="HH:mm"
+                    disableClock
+                    clearIcon={null}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                  />
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Giờ đóng cửa
+                  </label>
+                  <TimePicker
+                    onChange={(value) =>
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        closingTime: value || "20:00",
+                      })
+                    }
+                    value={selectedSalon.closingTime
+                      .split(":")
+                      .slice(0, 2)
+                      .join(":")}
+                    format="HH:mm"
+                    disableClock
+                    clearIcon={null}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                  />
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedSalon.contact}
+                    onChange={(e) =>
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        contact: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                  />
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={selectedSalon.email}
+                    onChange={(e) =>
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        email: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    placeholder="Nhập email"
+                  />
+                </div>
+                <div className="flex-1 min-w-[280px]">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Chủ salon
+                  </label>
+                  <select
+                    value={selectedSalon.ownerId}
+                    onChange={(e) =>
+                      setSelectedSalon({
+                        ...selectedSalon,
+                        ownerId: parseInt(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                  >
+                    <option value="">Chọn chủ salon</option>
+                    {owners.map((owner) => (
+                      <option key={owner.id} value={owner.id}>
+                        {owner.fullName} ({owner.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Hình ảnh
+                  </label>
+                  {selectedSalon.images && selectedSalon.images.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {selectedSalon.images.map((image, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={`http://localhost:8084/salon-images/${image}`}
+                            alt={`Current image ${index + 1}`}
+                            className="w-24 h-24 object-cover rounded-lg shadow-md border border-gray-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index, true)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, true)}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm mt-3"
+                  />
+                  {editImagePreviews.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {editImagePreviews.map((preview, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            className="w-24 h-24 object-cover rounded-lg shadow-md border border-gray-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index, true)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {editImages.length > 0 && (
+                    <p className="text-gray-400 text-xs mt-2">
+                      Hình ảnh mới: {editImages.join(", ")}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Địa chỉ
-                </label>
-                <input
-                  type="text"
-                  value={selectedSalon.address}
-                  onChange={(e) =>
-                    setSelectedSalon({
-                      ...selectedSalon,
-                      address: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Thành phố
-                </label>
-                <input
-                  type="text"
-                  value={selectedSalon.city}
-                  onChange={(e) =>
-                    setSelectedSalon({ ...selectedSalon, city: e.target.value })
-                  }
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Giờ mở cửa
-                </label>
-                <TimePicker
-                  onChange={(value) =>
-                    setSelectedSalon({
-                      ...selectedSalon,
-                      openingTime: value || "09:00",
-                    })
-                  }
-                  value={selectedSalon.openingTime}
-                  format="HH:mm"
-                  disableClock
-                  clearIcon={null}
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Giờ đóng cửa
-                </label>
-                <TimePicker
-                  onChange={(value) =>
-                    setSelectedSalon({
-                      ...selectedSalon,
-                      closingTime: value || "21:00",
-                    })
-                  }
-                  value={selectedSalon.closingTime}
-                  format="HH:mm"
-                  disableClock
-                  clearIcon={null}
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Số điện thoại
-                </label>
-                <input
-                  type="text"
-                  value={selectedSalon.contact}
-                  onChange={(e) =>
-                    setSelectedSalon({
-                      ...selectedSalon,
-                      contact: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={selectedSalon.email}
-                  onChange={(e) =>
-                    setSelectedSalon({
-                      ...selectedSalon,
-                      email: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
-                />
-              </div>
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end gap-3 mt-6">
                 <button
-                  onClick={() => setIsEditModalOpen(false)}
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditImagePreviews([]);
+                    setEditImages([]);
+                  }}
                   className="px-5 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition shadow-sm"
                 >
                   Hủy
@@ -1045,8 +1477,7 @@ const Salons = () => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-
-            <div className="mb-6 rounded-lg overflow-hidden">
+            <div className="mb-6 rounded-lg overflow-hidden relative">
               <img
                 src={
                   selectedSalon.images && selectedSalon.images.length > 0
@@ -1054,10 +1485,15 @@ const Salons = () => {
                     : "/api/placeholder/600/400"
                 }
                 alt={selectedSalon.name}
-                className="w-full h-56 object-cover"
+                className="w-full h-56 object-cover cursor-pointer"
+                onClick={() => handleViewImage(0)}
               />
+              {selectedSalon.images && selectedSalon.images.length > 1 && (
+                <div className="absolute bottom-2 right-2 bg-gray-800/70 rounded-full px-2 py-1 text-xs text-white">
+                  {selectedSalon.images.length} ảnh
+                </div>
+              )}
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="space-y-2">
                 <div className="flex items-center">
@@ -1066,13 +1502,32 @@ const Salons = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Địa chỉ</p>
-                    <p className="text-white">
-                      {selectedSalon.address}, {selectedSalon.city}
+                    <p
+                      className="text-white cursor-pointer hover:text-indigo-300"
+                      onClick={() => setModalOpen(true)}
+                    >
+                      {fullAddress}
                     </p>
+
+                    {isModalOpen && (
+                      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                        <div className="bg-[rgb(30,30,60)] text-[rgb(220,220,220)] p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
+                          <h2 className="text-lg font-semibold mb-4">
+                            Địa chỉ chi tiết
+                          </h2>
+                          <p className="min-h-[60px]">{fullAddress}</p>
+                          <button
+                            onClick={() => setModalOpen(false)}
+                            className="mt-6 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded"
+                          >
+                            Đóng
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <div className="flex items-center">
                   <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
@@ -1086,7 +1541,6 @@ const Salons = () => {
                   </div>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <div className="flex items-center">
                   <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
@@ -1098,7 +1552,6 @@ const Salons = () => {
                   </div>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <div className="flex items-center">
                   <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
@@ -1110,7 +1563,6 @@ const Salons = () => {
                   </div>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <div className="flex items-center">
                   <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
@@ -1122,7 +1574,6 @@ const Salons = () => {
                   </div>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <div className="flex items-center">
                   <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
@@ -1135,8 +1586,13 @@ const Salons = () => {
                 </div>
               </div>
             </div>
-
             <div className="flex justify-end space-x-3 pt-3 border-t border-gray-700/50">
+              <button
+                onClick={handleViewOwnerInfo}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                Thông tin chủ salon
+              </button>
               <button
                 onClick={() => setIsDetailModalOpen(false)}
                 className="px-4 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition-colors"
@@ -1152,6 +1608,179 @@ const Salons = () => {
               >
                 Chỉnh sửa
               </button>
+              <button
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDeleteModalOpen && selectedSalon && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
+          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-yellow-500/20 p-3 rounded-full">
+                <svg
+                  className="w-8 h-8 text-yellow-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-center text-yellow-400">
+              Xác nhận xóa
+            </h3>
+            <p className="text-gray-300 text-center mt-2">
+              Bạn có chắc muốn xóa salon "{selectedSalon.name}"?
+            </p>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleDeleteSalon}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isOwnerModalOpen && selectedOwner && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+          onClick={() => setIsOwnerModalOpen(false)}
+        >
+          <div
+            className="bg-gradient-to-br from-gray-900 to-indigo-900 p-6 rounded-2xl max-w-md w-full mx-4 shadow-2xl border border-gray-700/50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">
+                Thông tin chủ salon
+              </h2>
+              <button
+                onClick={() => setIsOwnerModalOpen(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
+                  <User className="h-4 w-4 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Họ tên</p>
+                  <p className="text-white">{selectedOwner.fullName}</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
+                  <Mail className="h-4 w-4 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Email</p>
+                  <p className="text-white">{selectedOwner.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
+                  <Phone className="h-4 w-4 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Số điện thoại</p>
+                  <p className="text-white">{selectedOwner.phone}</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                <div className="w-8 h-8 flex items-center justify-center bg-indigo-900/50 rounded-lg mr-3">
+                  <User className="h-4 w-4 text-indigo-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Username</p>
+                  <p className="text-white">{selectedOwner.username}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setIsOwnerModalOpen(false)}
+                className="px-4 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isImageModalOpen && selectedSalon && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
+          onClick={() => setIsImageModalOpen(false)}
+        >
+          <div
+            className="relative max-w-4xl w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsImageModalOpen(false)}
+              className="absolute top-4 right-4 text-white bg-gray-800/70 rounded-full p-2 hover:bg-gray-700/70"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <div className="bg-gray-900 rounded-xl overflow-hidden">
+              <img
+                src={`http://localhost:8084/salon-images/${selectedSalon.images[selectedImageIndex]}`}
+                alt={`Salon image ${selectedImageIndex + 1}`}
+                className="w-full h-[60vh] object-contain"
+              />
+              {selectedSalon.images.length > 1 && (
+                <div className="flex justify-between p-4">
+                  <button
+                    onClick={() =>
+                      setSelectedImageIndex((prev) =>
+                        prev === 0 ? selectedSalon.images.length - 1 : prev - 1
+                      )
+                    }
+                    className="px-4 py-2 bg-gray-800/70 text-white rounded-lg hover:bg-gray-700/70"
+                  >
+                    Trước
+                  </button>
+                  <span className="text-gray-300">
+                    {selectedImageIndex + 1} / {selectedSalon.images.length}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setSelectedImageIndex((prev) =>
+                        prev === selectedSalon.images.length - 1 ? 0 : prev + 1
+                      )
+                    }
+                    className="px-4 py-2 bg-gray-800/70 text-white rounded-lg hover:bg-gray-700/70"
+                  >
+                    Sau
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1178,15 +1807,17 @@ const Salons = () => {
               </div>
             </div>
             <h3 className="text-xl font-bold text-center text-green-400">
-              Thành công!
+              Thành công
             </h3>
             <p className="text-gray-300 text-center mt-2">{modalMessage}</p>
-            <button
-              onClick={() => setIsSuccessModalOpen(false)}
-              className="w-full mt-6 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-all"
-            >
-              OK
-            </button>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setIsSuccessModalOpen(false)}
+                className="px-4 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1196,17 +1827,31 @@ const Salons = () => {
           <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6">
             <div className="flex items-center justify-center mb-4">
               <div className="bg-red-500/20 p-3 rounded-full">
-                <X className="w-8 h-8 text-red-500" />
+                <svg
+                  className="w-8 h-8 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
               </div>
             </div>
-            <h3 className="text-xl font-bold text-center text-red-400">Lỗi!</h3>
+            <h3 className="text-xl font-bold text-center text-red-400">Lỗi</h3>
             <p className="text-gray-300 text-center mt-2">{modalMessage}</p>
-            <button
-              onClick={() => setIsErrorModalOpen(false)}
-              className="w-full mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all"
-            >
-              OK
-            </button>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setIsErrorModalOpen(false)}
+                className="px-4 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

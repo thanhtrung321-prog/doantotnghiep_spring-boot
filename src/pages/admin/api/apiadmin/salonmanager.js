@@ -1,12 +1,13 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:8084/salon"; // Thay đổi URL nếu cần
+const API_URL = "http://localhost:8084/salon";
+const USER_API_URL = "http://localhost:8082/user";
 
 // Lấy tất cả salon
 export const getAllSalons = async () => {
   try {
     const response = await axios.get(`${API_URL}`);
-    return response.data; // Trả về List<SalonDTO>
+    return response.data;
   } catch (error) {
     console.error("Error fetching all salons:", error);
     throw error;
@@ -17,7 +18,7 @@ export const getAllSalons = async () => {
 export const getSalonById = async (salonId) => {
   try {
     const response = await axios.get(`${API_URL}/${salonId}`);
-    return response.data; // Trả về SalonDTO
+    return response.data;
   } catch (error) {
     console.error("Error fetching salon by ID:", error);
     throw error;
@@ -28,7 +29,7 @@ export const getSalonById = async (salonId) => {
 export const getSalonByOwnerId = async (ownerId) => {
   try {
     const response = await axios.get(`${API_URL}/owner/${ownerId}`);
-    return response.data; // Trả về SalonDTO
+    return response.data;
   } catch (error) {
     console.error("Error fetching salon by owner ID:", error);
     throw error;
@@ -41,7 +42,7 @@ export const searchSalonsByCity = async (city) => {
     const response = await axios.get(`${API_URL}/search`, {
       params: { city },
     });
-    return response.data; // Trả về List<SalonDTO>
+    return response.data;
   } catch (error) {
     console.error("Error searching salons by city:", error);
     throw error;
@@ -52,7 +53,7 @@ export const searchSalonsByCity = async (city) => {
 export const createSalon = async (salon) => {
   try {
     const response = await axios.post(`${API_URL}`, salon);
-    return response.data; // Trả về SalonDTO
+    return response.data;
   } catch (error) {
     console.error("Error creating salon:", error);
     throw error;
@@ -63,45 +64,42 @@ export const createSalon = async (salon) => {
 export const updateSalon = async (salonId, salon) => {
   try {
     const response = await axios.patch(`${API_URL}/${salonId}`, salon);
-    return response.data; // Trả về SalonDTO
+    return response.data;
   } catch (error) {
     console.error("Error updating salon:", error);
     throw error;
   }
 };
 
-// Upload hình ảnh cho salon
-export const uploadImages = async (salonId, files) => {
+// Xóa salon
+export const deleteSalon = async (salonId) => {
   try {
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-    const response = await axios.post(
-      `${API_URL}/${salonId}/images`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
-    return response.data; // Trả về List<String> (đường dẫn hình ảnh)
+    const response = await axios.delete(`${API_URL}/${salonId}`);
+    return response.data;
   } catch (error) {
-    console.error("Error uploading images:", error);
+    console.error("Error deleting salon:", error);
     throw error;
   }
 };
 
-// Xóa hình ảnh của salon
-export const deleteImage = async (salonId, imagePath) => {
+// Lấy danh sách owner
+export const getOwners = async () => {
   try {
-    const response = await axios.post(
-      `${API_URL}/${salonId}/images/delete`,
-      null,
-      {
-        params: { imagePath },
-      }
-    );
-    return response.data; // Trả về thông báo thành công (String)
+    const response = await axios.get(`${USER_API_URL}`);
+    return response.data.filter((user) => user.role === "OWNER");
   } catch (error) {
-    console.error("Error deleting image:", error);
+    console.error("Error fetching owners:", error);
+    throw error;
+  }
+};
+
+// Lấy thông tin owner theo ID
+export const getOwnerById = async (ownerId) => {
+  try {
+    const response = await axios.get(`${USER_API_URL}/${ownerId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching owner by ID:", error);
     throw error;
   }
 };
