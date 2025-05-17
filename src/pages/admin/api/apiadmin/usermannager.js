@@ -2,6 +2,7 @@ import axios from "axios";
 
 // Base URL của API
 const API_URL = "http://localhost:8082/user";
+const SALON_API_URL = "http://localhost:8084/salon";
 
 // Lấy danh sách tất cả người dùng
 export const getAllUsers = async () => {
@@ -43,6 +44,17 @@ export const deleteUser = async (id) => {
     return response.data;
   } catch (error) {
     console.error("Lỗi khi xoá người dùng:", error);
+    throw error;
+  }
+};
+
+// Lấy danh sách tất cả salon
+export const getAllSalons = async () => {
+  try {
+    const response = await axios.get(SALON_API_URL);
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách salon:", error);
     throw error;
   }
 };

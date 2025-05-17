@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import * as THREE from "three";
+import { gsap } from "gsap";
+import AOS from "aos";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+import "aos/dist/aos.css";
 import {
   getAllUsers,
   createUser,
   updateUser,
   deleteUser,
+  getAllSalons,
 } from "../../api/apiadmin/usermannager";
 
 const Users = () => {
@@ -14,7 +18,8 @@ const Users = () => {
   const [selectedRole, setSelectedRole] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState({
     key: "createdAt",
     direction: "desc",
@@ -27,18 +32,58 @@ const Users = () => {
     phone: "",
     role: "USER",
     password: "",
+    salonId: null,
   });
+  const [salons, setSalons] = useState([]);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] =
     useState(false);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [roleModalUsers, setRoleModalUsers] = useState([]);
+  const [roleModalTitle, setRoleModalTitle] = useState("");
   const [modalMessage, setModalMessage] = useState("");
   const [userIdToDelete, setUserIdToDelete] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 5;
+  const titleRef = useRef(null);
+  const modalRef = useRef(null);
+  const tableRef = useRef(null);
+  const tableRowsRef = useRef([]);
+  const noUsersMessageRef = useRef(null);
 
-  const threeCanvasRef = useRef(null);
-
-  // Lấy thông tin người dùng hiện tại từ localStorage
   const currentUser = JSON.parse(localStorage.getItem("user")) || {};
+
+  // Define pagination variables
+  const indexOfLastUser = currentPage * usersPerPage;
+  const indexOfFirstUser = indexOfLastUser - usersPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
+  useEffect(() => {
+    AOS.init({
+      duration: 500,
+      easing: "ease-out",
+      once: true,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (titleRef.current) {
+      const letters = titleRef.current.querySelectorAll(".letter");
+      gsap.fromTo(
+        letters,
+        { opacity: 0, y: 20 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.5,
+          stagger: 0.05,
+          ease: "power2.out",
+        }
+      );
+    }
+  }, []);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -49,7 +94,9 @@ const Users = () => {
         setFilteredUsers(data);
       } catch (error) {
         console.error("Failed to fetch users:", error);
-        setModalMessage("Failed to fetch users. Please try again later.");
+        setModalMessage(
+          "Không thể tải danh sách người dùng. Vui lòng thử lại."
+        );
         setIsErrorModalOpen(true);
       } finally {
         setIsLoading(false);
@@ -59,11 +106,90 @@ const Users = () => {
   }, []);
 
   useEffect(() => {
+    if (isAddModalOpen || isEditModalOpen) {
+      const fetchSalons = async () => {
+        try {
+          const data = await getAllSalons();
+          setSalons(data);
+        } catch (error) {
+          console.error("Failed to fetch salons:", error);
+          setModalMessage("Không thể tải danh sách salon. Vui lòng thử lại.");
+          setIsErrorModalOpen(true);
+        }
+      };
+      fetchSalons();
+    }
+  }, [isAddModalOpen, isEditModalOpen]);
+
+  useEffect(() => {
+    const isAnyModalOpen =
+      isViewModalOpen ||
+      isEditModalOpen ||
+      isAddModalOpen ||
+      isSuccessModalOpen ||
+      isErrorModalOpen ||
+      isConfirmDeleteModalOpen ||
+      isRoleModalOpen;
+
+    if (isAnyModalOpen && modalRef.current) {
+      gsap.fromTo(
+        modalRef.current,
+        { scale: 0.8, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.7)" }
+      );
+    }
+  }, [
+    isViewModalOpen,
+    isEditModalOpen,
+    isAddModalOpen,
+    isSuccessModalOpen,
+    isErrorModalOpen,
+    isConfirmDeleteModalOpen,
+    isRoleModalOpen,
+  ]);
+
+  useEffect(() => {
+    if (currentUsers.length === 0 && noUsersMessageRef.current && !isLoading) {
+      gsap.fromTo(
+        noUsersMessageRef.current,
+        { opacity: 0, scale: 0.8, y: 20 },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.6,
+          ease: "elastic.out(1, 0.3)",
+        }
+      );
+    }
+  }, [currentUsers, isLoading]);
+
+  useEffect(() => {
+    if (
+      tableRowsRef.current.length > 0 &&
+      tableRef.current &&
+      currentUsers.length > 0
+    ) {
+      gsap.fromTo(
+        tableRowsRef.current,
+        { opacity: 0, y: 20 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: "power2.out",
+        }
+      );
+    }
+  }, [filteredUsers, currentPage, currentUsers]);
+
+  useEffect(() => {
     let result = [...users];
 
     if (selectedRole !== "all") {
       result = result.filter(
-        (user) => user.role.toLowerCase() === selectedRole
+        (user) => user.role.toLowerCase() === selectedRole.toLowerCase()
       );
     }
 
@@ -81,123 +207,17 @@ const Users = () => {
 
     if (sortConfig.key) {
       result.sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-        if (aValue < bValue) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
+        const aValue = a[sortConfig.key] || "";
+        const bValue = b[sortConfig.key] || "";
+        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
 
     setFilteredUsers(result);
+    setCurrentPage(1);
   }, [users, searchTerm, selectedRole, sortConfig]);
-
-  useEffect(() => {
-    if (!threeCanvasRef.current) return;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / 300,
-      0.1,
-      1000
-    );
-    const renderer = new THREE.WebGLRenderer({
-      canvas: threeCanvasRef.current,
-      alpha: true,
-      antialias: true,
-    });
-
-    renderer.setSize(window.innerWidth, 300);
-    renderer.setClearColor(0x000000, 0);
-
-    const particlesGeometry = new THREE.BufferGeometry();
-    const particleCount = 1500;
-
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-
-    const color1 = new THREE.Color(0xff6b00);
-    const color2 = new THREE.Color(0xff3300);
-
-    for (let i = 0; i < particleCount; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 10;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 5;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 5;
-
-      const blendFactor = Math.random();
-      const blendedColor = color1.clone().lerp(color2, blendFactor);
-
-      colors[i * 3] = blendedColor.r;
-      colors[i * 3 + 1] = blendedColor.g;
-      colors[i * 3 + 2] = blendedColor.b;
-    }
-
-    particlesGeometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(positions, 3)
-    );
-    particlesGeometry.setAttribute(
-      "color",
-      new THREE.BufferAttribute(colors, 3)
-    );
-
-    const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.02,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.8,
-    });
-
-    const particlesMesh = new THREE.Points(
-      particlesGeometry,
-      particlesMaterial
-    );
-    scene.add(particlesMesh);
-
-    camera.position.z = 5;
-
-    let mouseX = 0;
-    let mouseY = 0;
-
-    const handleMouseMove = (event) => {
-      mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-      mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-
-    const animate = () => {
-      requestAnimationFrame(animate);
-      particlesMesh.rotation.x += 0.001;
-      particlesMesh.rotation.y += 0.002;
-      particlesMesh.rotation.x += mouseY * 0.001;
-      particlesMesh.rotation.y += mouseX * 0.001;
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / 300;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, 300);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("resize", handleResize);
-      particlesGeometry.dispose();
-      particlesMaterial.dispose();
-      renderer.dispose();
-    };
-  }, []);
 
   const requestSort = (key) => {
     let direction = "asc";
@@ -213,13 +233,22 @@ const Users = () => {
   };
 
   const handleUserSelect = (user) => {
-    setSelectedUser(user);
-    setIsModalOpen(true);
+    setSelectedUser({ ...user, salonId: user.salonId || null });
+    setIsViewModalOpen(true);
+  };
+
+  const handleRoleCardClick = (role, title) => {
+    const filtered = users.filter(
+      (user) => user.role.toLowerCase() === role.toLowerCase()
+    );
+    setRoleModalUsers(filtered);
+    setRoleModalTitle(title);
+    setIsRoleModalOpen(true);
   };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat("vi-VN", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -231,20 +260,24 @@ const Users = () => {
   const getRoleBadgeColor = (role) => {
     switch (role.toLowerCase()) {
       case "admin":
-        return "bg-red-500";
+        return "bg-red-600 text-white";
       case "staff":
-        return "bg-orange-400";
+        return "bg-orange-500 text-white";
       case "owner":
-        return "bg-purple-500";
+        return "bg-purple-600 text-white";
       default:
-        return "bg-blue-500";
+        return "bg-blue-500 text-white";
     }
   };
 
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      const createdUser = await createUser(newUserData);
+      const userDataToSend = { ...newUserData };
+      if (newUserData.role !== "STAFF" && newUserData.role !== "OWNER") {
+        userDataToSend.salonId = null;
+      }
+      const createdUser = await createUser(userDataToSend);
       setUsers((prev) => [...prev, createdUser]);
       setIsAddModalOpen(false);
       setNewUserData({
@@ -254,38 +287,43 @@ const Users = () => {
         phone: "",
         role: "USER",
         password: "",
+        salonId: null,
       });
-      setModalMessage("User added successfully!");
+      setModalMessage("Thêm người dùng thành công!");
       setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("Failed to add user:", error);
-      setModalMessage("Failed to add user. Please try again.");
+      setModalMessage("Thêm người dùng thất bại. Vui lòng thử lại.");
       setIsErrorModalOpen(true);
     }
   };
 
   const handleUpdateUser = async () => {
-    // Kiểm tra nếu currentUser là ADMIN và selectedUser cũng là ADMIN
     if (
       currentUser.role.toLowerCase() === "admin" &&
       selectedUser.role.toLowerCase() === "admin"
     ) {
-      setModalMessage("Admins cannot edit other admins.");
+      setModalMessage("Quản trị viên không thể chỉnh sửa quản trị viên khác.");
       setIsErrorModalOpen(true);
       return;
     }
 
     try {
-      const updatedUser = await updateUser(selectedUser.id, selectedUser);
+      const userDataToSend = { ...selectedUser };
+      if (selectedUser.role !== "STAFF" && selectedUser.role !== "OWNER") {
+        userDataToSend.salonId = null;
+      }
+      const updatedUser = await updateUser(selectedUser.id, userDataToSend);
       setUsers((prev) =>
         prev.map((user) => (user.id === updatedUser.id ? updatedUser : user))
       );
-      setIsModalOpen(false);
-      setModalMessage("User updated successfully!");
+      setIsEditModalOpen(false);
+      setIsViewModalOpen(false);
+      setModalMessage("Cập nhật người dùng thành công!");
       setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("Failed to update user:", error);
-      setModalMessage("Failed to update user. Please try again.");
+      setModalMessage("Cập nhật người dùng thất bại. Vui lòng thử lại.");
       setIsErrorModalOpen(true);
     }
   };
@@ -300,17 +338,16 @@ const Users = () => {
       await deleteUser(userIdToDelete);
       setUsers((prev) => prev.filter((user) => user.id !== userIdToDelete));
       setIsConfirmDeleteModalOpen(false);
-      setModalMessage("User deleted successfully!");
+      setModalMessage("Xóa người dùng thành công!");
       setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("Failed to delete user:", error);
       setIsConfirmDeleteModalOpen(false);
-      setModalMessage("Failed to delete user. Please try again.");
+      setModalMessage("Xóa người dùng thất bại. Vui lòng thử lại.");
       setIsErrorModalOpen(true);
     }
   };
 
-  // Hàm kiểm tra xem có thể chỉnh sửa không
   const canEditUser = () => {
     if (!selectedUser || !currentUser.role) return false;
     return (
@@ -319,260 +356,254 @@ const Users = () => {
     );
   };
 
+  const handleButtonHover = (e) => {
+    gsap.to(e.currentTarget, {
+      scale: 1.1,
+      duration: 0.2,
+      ease: "power2.out",
+    });
+  };
+
+  const handleButtonLeave = (e) => {
+    gsap.to(e.currentTarget, {
+      scale: 1,
+      duration: 0.2,
+      ease: "power2.out",
+    });
+  };
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  const titleText = "Quản lý người dùng";
+  const titleLetters = titleText.split("").map((char, index) => (
+    <span key={index} className="letter inline-block">
+      {char === " " ? "\u00A0" : char}
+    </span>
+  ));
+
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-gray-900 text-white">
       <div className="relative z-10 container mx-auto px-4 py-6">
-        <div className="relative">
-          <canvas
-            ref={threeCanvasRef}
-            className="absolute top-0 left-0 w-full h-full opacity-50 pointer-events-none z-0"
-          />
-          <div className="relative z-10 mb-8 text-center">
-            <h2 className="text-3xl font-bold mb-2 text-orange-500">
-              <span className="text-amber-50">Quản Lý</span> Người dùng
-            </h2>
-            <p className="text-gray-400">Quản lý tất cả người dùng của bạn</p>
-          </div>
+        <div className="relative mb-8 text-center">
+          <h2
+            ref={titleRef}
+            className="text-3xl font-bold mb-2 text-orange-500"
+          >
+            {titleLetters}
+          </h2>
+          <p className="text-gray-400">Quản lý tất cả người dùng của bạn</p>
         </div>
 
         <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:w-1/3">
             <input
               type="text"
-              placeholder="Search users..."
-              className="w-full px-4 py-2 pl-10 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+              placeholder="Tìm kiếm người dùng..."
+              className="w-full px-4 py-2 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <svg
-              className="absolute left-3 top-2.5 h-5 w-5 text-gray-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <i className="fas fa-search absolute left-3 top-2.5 h-5 w-5 text-gray-500"></i>
           </div>
 
           <div className="w-full md:w-1/4">
             <select
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
               value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
+              onChange={(e) => {
+                setSelectedRole(e.target.value);
+                if (tableRef.current) {
+                  gsap.fromTo(
+                    tableRef.current,
+                    { opacity: 0.8, y: 10 },
+                    { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
+                  );
+                }
+              }}
             >
-              <option value="all">Tất cả quyền</option>
-              <option value="admin">Quản Trị Viên</option>
-              <option value="owner">Quản trị salon</option>
+              <option value="all">Tất cả vai trò</option>
+              <option value="admin">Quản trị viên</option>
+              <option value="owner">Chủ salon</option>
               <option value="staff">Nhân viên</option>
-              <option value="user">Người Dùng</option>
+              <option value="user">Người dùng</option>
             </select>
           </div>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="w-full md:w-auto px-6 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all flex items-center justify-center gap-2 cursor-pointer"
+            onMouseEnter={handleButtonHover}
+            onMouseLeave={handleButtonLeave}
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-            Thêm người dùng mới
+            <i className="fas fa-plus w-5 h-5"></i>
+            Thêm người dùng
           </button>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
+          <div
+            className="bg-gradient-to-r from-gray-800 to-gray-700 p-4 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-700 transition-all"
+            data-aos="fade-up"
+            data-aos-delay="100"
+            onClick={() => handleRoleCardClick("user", "Người dùng")}
+          >
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">Người Dùng</p>
+                <p className="text-gray-300 text-sm">Người dùng</p>
                 <p className="text-2xl font-bold">
                   {users.filter((u) => u.role.toLowerCase() === "user").length}
                 </p>
               </div>
-              <div className="bg-blue-500/20 p-3 rounded-full">
-                <svg
-                  className="w-6 h-6 text-blue-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
+              <div className="bg-blue-500 p-3 rounded-full">
+                <i className="fas fa-user w-6 h-6 text-white"></i>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
+          <div
+            className="bg-gradient-to-r from-gray-800 to-gray-700 p-4 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-700 transition-all"
+            data-aos="fade-up"
+            data-aos-delay="200"
+            onClick={() => handleRoleCardClick("staff", "Nhân viên")}
+          >
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">Nhân Viên</p>
+                <p className="text-gray-300 text-sm">Nhân viên</p>
                 <p className="text-2xl font-bold">
                   {users.filter((u) => u.role.toLowerCase() === "staff").length}
                 </p>
               </div>
-              <div className="bg-orange-500/20 p-3 rounded-full">
-                <svg
-                  className="w-6 h-6 text-orange-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
+              <div className="bg-orange-500 p-3 rounded-full">
+                <i className="fas fa-briefcase w-6 h-6 text-white"></i>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
+          <div
+            className="bg-gradient-to-r from-gray-800 to-gray-700 p-4 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-700 transition-all"
+            data-aos="fade-up"
+            data-aos-delay="300"
+            onClick={() => handleRoleCardClick("admin", "Quản trị viên")}
+          >
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">Quản Trị Viên</p>
+                <p className="text-gray-300 text-sm">Quản trị viên</p>
                 <p className="text-2xl font-bold">
                   {users.filter((u) => u.role.toLowerCase() === "admin").length}
                 </p>
               </div>
-              <div className="bg-red-500/20 p-3 rounded-full">
-                <svg
-                  className="w-6 h-6 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
+              <div className="bg-red-600 p-3 rounded-full">
+                <i className="fas fa-shield-alt w-6 h-6 text-white"></i>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-lg border border-gray-800">
+          <div
+            className="bg-gradient-to-r from-gray-800 to-gray-700 p-4 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-700 transition-all"
+            data-aos="fade-up"
+            data-aos-delay="400"
+            onClick={() => handleRoleCardClick("owner", "Chủ salon")}
+          >
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">Quản Trị Salon</p>
+                <p className="text-gray-300 text-sm">Chủ salon</p>
                 <p className="text-2xl font-bold">
                   {users.filter((u) => u.role.toLowerCase() === "owner").length}
                 </p>
               </div>
-              <div className="bg-purple-500/20 p-3 rounded-full">
-                <svg
-                  className="w-6 h-6 text-purple-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 11c0-1.104-.896-2-2-2s-2 .896-2 2c0 .738.402 1.376 1 1.723v2.277h2v-2.277c.598-.347 1-.985 1-1.723zm8-2c0-1.104-.896-2-2-2s-2 .896-2 2c0 .738.402 1.376 1 1.723v2.277h2v-2.277c.598-.347 1-.985 1-1.723zm-16 0c0-1.104-.896-2-2-2s-2 .896-2 2c0 .738.402 1.376 1 1.723v2.277h2v-2.277c.598-.347 1-.985 1-1.723zm12 12h-8c-2.757 0-5-2.243-5-5v-2c0-2.757 2.243-5 5-5h8c2.757 0 5 2.243 5 5v2c0 2.757-2.243 5-5 5z"
-                  />
-                </svg>
+              <div className="bg-purple-600 p-3 rounded-full">
+                <i className="fas fa-store w-6 h-6 text-white"></i>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-800">
+        <div
+          ref={tableRef}
+          className="bg-gray-800 rounded-xl overflow-hidden shadow-lg border border-gray-700"
+        >
           {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="p-6">
+              <div className="animate-pulse space-y-4">
+                <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+                <div className="h-4 bg-gray-700 rounded w-5/6"></div>
+                <div className="h-4 bg-gray-700 rounded w-2/3"></div>
+                <div className="h-4 bg-gray-700 rounded w-4/5"></div>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-800 text-left">
+                  <tr className="bg-gray-700 text-left">
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer hover:bg-gray-600"
                       onClick={() => requestSort("id")}
                     >
                       ID {getSortDirectionIndicator("id")}
                     </th>
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer hover:bg-gray-600"
                       onClick={() => requestSort("username")}
                     >
-                      Username {getSortDirectionIndicator("username")}
+                      Tên đăng nhập {getSortDirectionIndicator("username")}
                     </th>
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer hover:bg-gray-600"
                       onClick={() => requestSort("fullName")}
                     >
-                      Full Name {getSortDirectionIndicator("fullName")}
+                      Họ và tên {getSortDirectionIndicator("fullName")}
                     </th>
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer hover:bg-gray-600"
                       onClick={() => requestSort("email")}
                     >
                       Email {getSortDirectionIndicator("email")}
                     </th>
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer hover:bg-gray-600"
                       onClick={() => requestSort("phone")}
                     >
-                      Phone {getSortDirectionIndicator("phone")}
+                      Số điện thoại {getSortDirectionIndicator("phone")}
                     </th>
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer hover:bg-gray-600"
                       onClick={() => requestSort("role")}
                     >
-                      Role {getSortDirectionIndicator("role")}
+                      Vai trò {getSortDirectionIndicator("role")}
                     </th>
                     <th
-                      className="px-4 py-3 cursor-pointer hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer hover:bg-gray-600"
                       onClick={() => requestSort("createdAt")}
                     >
-                      Created {getSortDirectionIndicator("createdAt")}
+                      Ngày tạo {getSortDirectionIndicator("createdAt")}
                     </th>
-                    <th className="px-4 py-3 text-center">Actions</th>
+                    <th className="px-4 py-3 text-center">Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.length === 0 ? (
+                  {currentUsers.length === 0 ? (
                     <tr>
-                      <td
-                        colSpan="8"
-                        className="px-4 py-8 text-center text-gray-400"
-                      >
-                        No users found matching your criteria
+                      <td colSpan="8" className="px-4 py-8 text-center">
+                        <div
+                          ref={noUsersMessageRef}
+                          className="text-3xl font-bold text-orange-500"
+                        >
+                          Không tìm thấy người dùng nào
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((user, index) => (
+                    currentUsers.map((user, index) => (
                       <tr
                         key={user.id}
-                        className={`hover:bg-gray-800 ${
-                          index % 2 === 0 ? "bg-gray-850" : ""
+                        ref={(el) => (tableRowsRef.current[index] = el)}
+                        className={`hover:bg-gray-700 ${
+                          index % 2 === 0 ? "bg-gray-750" : ""
                         } transition-colors`}
+                        data-aos="fade-up"
+                        data-aos-delay={index * 50}
                       >
                         <td className="px-4 py-3">{user.id}</td>
                         <td className="px-4 py-3">{user.username}</td>
@@ -585,11 +616,17 @@ const Users = () => {
                         <td className="px-4 py-3">{user.phone}</td>
                         <td className="px-4 py-3">
                           <span
-                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(
+                            className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(
                               user.role
                             )}`}
                           >
-                            {user.role}
+                            {user.role === "ADMIN"
+                              ? "Quản trị viên"
+                              : user.role === "STAFF"
+                              ? "Nhân viên"
+                              : user.role === "OWNER"
+                              ? "Chủ salon"
+                              : "Người dùng"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-400">
@@ -599,68 +636,25 @@ const Users = () => {
                           <div className="flex justify-center space-x-2">
                             <button
                               onClick={() => handleUserSelect(user)}
-                              className="p-1.5 bg-blue-500 bg-opacity-20 rounded hover:bg-opacity-30 transition-all"
-                              title="View Details"
+                              className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all cursor-pointer"
+                              title="Xem chi tiết"
+                              data-aos="fade-left"
+                              data-aos-delay="100"
+                              onMouseEnter={handleButtonHover}
+                              onMouseLeave={handleButtonLeave}
                             >
-                              <svg
-                                className="w-4 h-4 text-blue-500"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleUserSelect(user)}
-                              className="p-1.5 bg-orange-500 bg-opacity-20 rounded hover:bg-opacity-30 transition-all"
-                              title="Edit User"
-                            >
-                              <svg
-                                className="w-4 h-4 text-orange-500"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
-                                />
-                              </svg>
+                              <i className="fas fa-eye w-4 h-4"></i>
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 bg-red-500 bg-opacity-20 rounded hover:bg-opacity-30 transition-all"
-                              title="Delete User"
+                              className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all cursor-pointer"
+                              title="Xóa người dùng"
+                              data-aos="fade-left"
+                              data-aos-delay="200"
+                              onMouseEnter={handleButtonHover}
+                              onMouseLeave={handleButtonLeave}
                             >
-                              <svg
-                                className="w-4 h-4 text-red-500"
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                />
-                              </svg>
+                              <i className="fas fa-trash-alt w-4 h-4"></i>
                             </button>
                           </div>
                         </td>
@@ -675,26 +669,51 @@ const Users = () => {
 
         <div className="flex justify-between items-center mt-6">
           <div className="text-sm text-gray-400">
-            Showing{" "}
+            Hiển thị{" "}
+            <span className="font-medium text-white">
+              {currentUsers.length}
+            </span>{" "}
+            trong số{" "}
             <span className="font-medium text-white">
               {filteredUsers.length}
             </span>{" "}
-            of <span className="font-medium text-white">{users.length}</span>{" "}
-            users
+            người dùng
           </div>
           <div className="flex space-x-1">
-            <button className="px-3 py-1 bg-gray-800 rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-              Previous
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              onMouseEnter={handleButtonHover}
+              onMouseLeave={handleButtonLeave}
+            >
+              Trước
             </button>
-            <button className="px-3 py-1 bg-orange-600 rounded-md">1</button>
-            <button className="px-3 py-1 bg-gray-800 rounded-md hover:bg-gray-700 transition-all">
-              2
-            </button>
-            <button className="px-3 py-1 bg-gray-800 rounded-md hover:bg-gray-700 transition-all">
-              3
-            </button>
-            <button className="px-3 py-1 bg-gray-800 rounded-md hover:bg-gray-700 transition-all">
-              Next
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+              (number) => (
+                <button
+                  key={number}
+                  onClick={() => paginate(number)}
+                  className={`px-3 py-1 rounded-md cursor-pointer ${
+                    currentPage === number
+                      ? "bg-orange-600"
+                      : "bg-gray-700 hover:bg-gray-600"
+                  } transition-all`}
+                  onMouseEnter={handleButtonHover}
+                  onMouseLeave={handleButtonLeave}
+                >
+                  {number}
+                </button>
+              )
+            )}
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              onMouseEnter={handleButtonHover}
+              onMouseLeave={handleButtonLeave}
+            >
+              Tiếp
             </button>
           </div>
         </div>
@@ -702,137 +721,155 @@ const Users = () => {
 
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-fade-in">
-            <div className="flex justify-between items-center border-b border-gray-800 p-4">
-              <h3 className="text-xl font-bold">Add New User</h3>
+          <div
+            ref={modalRef}
+            className="bg-gray-800 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-700"
+            data-aos="zoom-in"
+          >
+            <div className="flex justify-between items-center border-b border-gray-700 p-4">
+              <h3 className="text-xl font-bold">Thêm người dùng mới</h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-1 hover:bg-gray-800 rounded-full transition-all"
+                className="p-1 hover:bg-gray-700 rounded-full transition-all cursor-pointer"
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
               >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6L12 12"
-                  />
-                </svg>
+                <i className="fas fa-times w-6 h-6"></i>
               </button>
             </div>
             <form onSubmit={handleAddUser} className="p-6 space-y-4">
               <div>
-                <label className="text-sm text-gray-400">Full Name</label>
+                <label className="text-sm text-gray-300">Họ và tên</label>
                 <input
                   type="text"
                   value={newUserData.fullName}
                   onChange={(e) =>
                     setNewUserData({ ...newUserData, fullName: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   required
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Username</label>
+                <label className="text-sm text-gray-300">Tên đăng nhập</label>
                 <input
                   type="text"
                   value={newUserData.username}
                   onChange={(e) =>
                     setNewUserData({ ...newUserData, username: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   required
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Email</label>
+                <label className="text-sm text-gray-300">Email</label>
                 <input
                   type="email"
                   value={newUserData.email}
                   onChange={(e) =>
                     setNewUserData({ ...newUserData, email: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   required
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Phone</label>
+                <label className="text-sm text-gray-300">Số điện thoại</label>
                 <input
                   type="text"
                   value={newUserData.phone}
                   onChange={(e) =>
                     setNewUserData({ ...newUserData, phone: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   required
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400">Role</label>
+                <label className="text-sm text-gray-300">Vai trò</label>
                 <select
                   value={newUserData.role}
                   onChange={(e) =>
-                    setNewUserData({ ...newUserData, role: e.target.value })
+                    setNewUserData({
+                      ...newUserData,
+                      role: e.target.value,
+                      salonId: null,
+                    })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
-                  <option value="USER">Người Dùng</option>
+                  <option value="USER">Người dùng</option>
                   <option value="STAFF">Nhân viên</option>
-                  <option value="ADMIN">Quản Trị Viên</option>
-                  <option value="OWNER">Quản Trị Viên Salon</option>
+                  <option value="ADMIN">Quản trị viên</option>
+                  <option value="OWNER">Chủ salon</option>
                 </select>
               </div>
+              {(newUserData.role === "STAFF" ||
+                newUserData.role === "OWNER") && (
+                <div>
+                  <label className="text-sm text-gray-300">Salon</label>
+                  <select
+                    value={newUserData.salonId || ""}
+                    onChange={(e) =>
+                      setNewUserData({
+                        ...newUserData,
+                        salonId: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                  >
+                    <option value="">Chọn salon</option>
+                    {salons.map((salon) => (
+                      <option key={salon.id} value={salon.id}>
+                        {salon.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
-                <label className="text-sm text-gray-400">Password</label>
+                <label className="text-sm text-gray-300">Mật khẩu</label>
                 <input
                   type="password"
                   value={newUserData.password}
                   onChange={(e) =>
                     setNewUserData({ ...newUserData, password: e.target.value })
                   }
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   required
                 />
               </div>
               <button
                 type="submit"
-                className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all"
+                className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all cursor-pointer"
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
               >
-                Add User
+                Thêm người dùng
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {isModalOpen && selectedUser && (
+      {isViewModalOpen && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-800 animate-fade-in">
-            <div className="flex justify-between items-center border-b border-gray-800 p-4">
-              <h3 className="text-xl font-bold">User Details</h3>
+          <div
+            ref={modalRef}
+            className="bg-gray-800 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-700"
+            data-aos="zoom-in"
+          >
+            <div className="flex justify-between items-center border-b border-gray-700 p-4">
+              <h3 className="text-xl font-bold">Chi tiết người dùng</h3>
               <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 hover:bg-gray-800 rounded-full transition-all"
+                onClick={() => setIsViewModalOpen(false)}
+                className="p-1 hover:bg-gray-700 rounded-full transition-all cursor-pointer"
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
               >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <i className="fas fa-times w-6 h-6"></i>
               </button>
             </div>
             <div className="p-6">
@@ -845,6 +882,122 @@ const Users = () => {
                         .join("")
                     : "N/A"}
                 </div>
+                <p className="text-xl font-bold">
+                  {selectedUser.fullName || "N/A"}
+                </p>
+                <span
+                  className={`mt-2 px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(
+                    selectedUser.role
+                  )}`}
+                >
+                  {selectedUser.role === "ADMIN"
+                    ? "Quản trị viên"
+                    : selectedUser.role === "STAFF"
+                    ? "Nhân viên"
+                    : selectedUser.role === "OWNER"
+                    ? "Chủ salon"
+                    : "Người dùng"}
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-300">Tên đăng nhập</p>
+                    <p className="font-medium">{selectedUser.username}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-300">ID người dùng</p>
+                    <p className="font-medium">{selectedUser.id}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-300">Email</p>
+                  <p className="font-medium">{selectedUser.email}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-300">Số điện thoại</p>
+                  <p className="font-medium">{selectedUser.phone}</p>
+                </div>
+
+                {(selectedUser.role === "STAFF" ||
+                  selectedUser.role === "OWNER") && (
+                  <div>
+                    <p className="text-sm text-gray-300">Salon</p>
+                    <p className="font-medium">
+                      {salons.find((s) => s.id === selectedUser.salonId)
+                        ?.name || "N/A"}
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-300">Ngày tạo</p>
+                    <p className="font-medium">
+                      {formatDate(selectedUser.createdAt)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-300">Cập nhật lần cuối</p>
+                    <p className="font-medium">
+                      {formatDate(selectedUser.updatedAt)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 flex space-x-3">
+                {canEditUser() && (
+                  <button
+                    onClick={() => {
+                      setIsViewModalOpen(false);
+                      setIsEditModalOpen(true);
+                    }}
+                    className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all cursor-pointer"
+                    onMouseEnter={handleButtonHover}
+                    onMouseLeave={handleButtonLeave}
+                  >
+                    <i className="fas fa-edit mr-2"></i>Chỉnh sửa
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all cursor-pointer"
+                  onMouseEnter={handleButtonHover}
+                  onMouseLeave={handleButtonLeave}
+                >
+                  <i className="fas fa-times mr-2"></i>Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEditModalOpen && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div
+            ref={modalRef}
+            className="bg-gray-800 w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border border-gray-700"
+            data-aos="zoom-in"
+          >
+            <div className="flex justify-between items-center border-b border-gray-700 p-4">
+              <h3 className="text-xl font-bold">Chỉnh sửa người dùng</h3>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1 hover:bg-gray-700 rounded-full transition-all cursor-pointer"
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
+              >
+                <i className="fas fa-times w-6 h-6"></i>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm text-gray-300">Họ và tên</label>
                 <input
                   type="text"
                   value={selectedUser.fullName || ""}
@@ -854,114 +1007,113 @@ const Users = () => {
                       fullName: e.target.value,
                     })
                   }
-                  className="text-xl font-bold bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-center"
-                  disabled={!canEditUser()}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Tên đăng nhập</label>
+                <input
+                  type="text"
+                  value={selectedUser.username}
+                  onChange={(e) =>
+                    setSelectedUser({
+                      ...selectedUser,
+                      username: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Email</label>
+                <input
+                  type="email"
+                  value={selectedUser.email}
+                  onChange={(e) =>
+                    setSelectedUser({
+                      ...selectedUser,
+                      email: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Số điện thoại</label>
+                <input
+                  type="text"
+                  value={selectedUser.phone}
+                  onChange={(e) =>
+                    setSelectedUser({
+                      ...selectedUser,
+                      phone: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Vai trò</label>
                 <select
                   value={selectedUser.role}
                   onChange={(e) =>
-                    setSelectedUser({ ...selectedUser, role: e.target.value })
+                    setSelectedUser({
+                      ...selectedUser,
+                      role: e.target.value,
+                      salonId:
+                        e.target.value === "STAFF" || e.target.value === "OWNER"
+                          ? selectedUser.salonId
+                          : null,
+                    })
                   }
-                  className={`mt-1 px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(
-                    selectedUser.role
-                  )} bg-gray-800 border border-gray-700`}
-                  disabled={!canEditUser()}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
-                  <option value="USER">Người Dùng</option>
+                  <option value="USER">Người dùng</option>
                   <option value="STAFF">Nhân viên</option>
-                  <option value="ADMIN">Quản Trị Viên</option>
-                  <option value="OWNER">Quản Trị Viên Salon</option>
+                  <option value="ADMIN">Quản trị viên</option>
+                  <option value="OWNER">Chủ salon</option>
                 </select>
               </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-400">Username</p>
-                    <input
-                      type="text"
-                      value={selectedUser.username}
-                      onChange={(e) =>
-                        setSelectedUser({
-                          ...selectedUser,
-                          username: e.target.value,
-                        })
-                      }
-                      className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
-                      disabled={!canEditUser()}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">User ID</p>
-                    <p className="font-medium">{selectedUser.id}</p>
-                  </div>
-                </div>
-
+              {(selectedUser.role === "STAFF" ||
+                selectedUser.role === "OWNER") && (
                 <div>
-                  <p className="text-sm text-gray-400">Email Address</p>
-                  <input
-                    type="email"
-                    value={selectedUser.email}
+                  <label className="text-sm text-gray-300">Salon</label>
+                  <select
+                    value={selectedUser.salonId || ""}
                     onChange={(e) =>
                       setSelectedUser({
                         ...selectedUser,
-                        email: e.target.value,
+                        salonId: e.target.value ? Number(e.target.value) : null,
                       })
                     }
-                    className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
-                    disabled={!canEditUser()}
-                  />
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                  >
+                    <option value="">Chọn salon</option>
+                    {salons.map((salon) => (
+                      <option key={salon.id} value={salon.id}>
+                        {salon.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-
-                <div>
-                  <p className="text-sm text-gray-400">Phone Number</p>
-                  <input
-                    type="text"
-                    value={selectedUser.phone}
-                    onChange={(e) =>
-                      setSelectedUser({
-                        ...selectedUser,
-                        phone: e.target.value,
-                      })
-                    }
-                    className="font-medium bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 w-full"
-                    disabled={!canEditUser()}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-400">Created At</p>
-                    <p className="font-medium">
-                      {formatDate(selectedUser.createdAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Last Updated</p>
-                    <p className="font-medium">
-                      {formatDate(selectedUser.updatedAt)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
+              )}
               <div className="mt-8 flex space-x-3">
                 <button
                   onClick={handleUpdateUser}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-                    canEditUser()
-                      ? "bg-orange-600 hover:bg-orange-700"
-                      : "bg-gray-600 cursor-not-allowed"
-                  }`}
-                  disabled={!canEditUser()}
+                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all cursor-pointer"
+                  onMouseEnter={handleButtonHover}
+                  onMouseLeave={handleButtonLeave}
                 >
-                  Save Changes
+                  <i className="fas fa-save mr-2"></i>Lưu thay đổi
                 </button>
                 <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg font-medium transition-all"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all cursor-pointer"
+                  onMouseEnter={handleButtonHover}
+                  onMouseLeave={handleButtonLeave}
                 >
-                  Cancel
+                  <i className="fas fa-times mr-2"></i>Đóng
                 </button>
               </div>
             </div>
@@ -969,33 +1121,146 @@ const Users = () => {
         </div>
       )}
 
+      {isRoleModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div
+            ref={modalRef}
+            className="bg-gray-800 w-full max-w-4xl rounded-xl overflow-hidden shadow-2xl border border-gray-700"
+            data-aos="zoom-in"
+          >
+            <div className="flex justify-between items-center border-b border-gray-700 p-4">
+              <h3 className="text-xl font-bold">{roleModalTitle}</h3>
+              <button
+                onClick={() => setIsRoleModalOpen(false)}
+                className="p-1 hover:bg-gray-700 rounded-full transition-all cursor-pointer"
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
+              >
+                <i className="fas fa-times w-6 h-6"></i>
+              </button>
+            </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-700 text-left">
+                    <th className="px-4 py-3">ID</th>
+                    <th className="px-4 py-3">Tên đăng nhập</th>
+                    <th className="px-4 py-3">Họ và tên</th>
+                    <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3">Số điện thoại</th>
+                    <th className="px-4 py-3">Vai trò</th>
+                    <th className="px-4 py-3">Ngày tạo</th>
+                    <th className="px-4 py-3 text-center">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roleModalUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-4 py-8 text-center">
+                        <div
+                          ref={noUsersMessageRef}
+                          className="text-3xl font-bold text-orange-500"
+                        >
+                          Không tìm thấy người dùng bạn nhập
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    roleModalUsers.map((user, index) => (
+                      <tr
+                        key={user.id}
+                        className={`hover:bg-gray-700 ${
+                          index % 2 === 0 ? "bg-gray-750" : ""
+                        } transition-colors`}
+                        data-aos="fade-up"
+                        data-aos-delay={index * 50}
+                      >
+                        <td className="px-4 py-3">{user.id}</td>
+                        <td className="px-4 py-3">{user.username}</td>
+                        <td className="px-4 py-3 font-medium">
+                          {user.fullName || "N/A"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-300">
+                          {user.email}
+                        </td>
+                        <td className="px-4 py-3">{user.phone}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(
+                              user.role
+                            )}`}
+                          >
+                            {user.role === "ADMIN"
+                              ? "Quản trị viên"
+                              : user.role === "STAFF"
+                              ? "Nhân viên"
+                              : user.role === "OWNER"
+                              ? "Chủ salon"
+                              : "Người dùng"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-400">
+                          {formatDate(user.createdAt)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-center space-x-2">
+                            <button
+                              onClick={() => {
+                                setIsRoleModalOpen(false);
+                                handleUserSelect(user);
+                              }}
+                              className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all cursor-pointer"
+                              title="Xem chi tiết"
+                              onMouseEnter={handleButtonHover}
+                              onMouseLeave={handleButtonLeave}
+                            >
+                              <i className="fas fa-eye w-4 h-4"></i>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsRoleModalOpen(false);
+                                handleDeleteUser(user.id);
+                              }}
+                              className="p-2 bg-red-600 text-white rounded-full hover:bg-red-600 transition-all cursor-pointer"
+                              title="Xóa người dùng"
+                              onMouseEnter={handleButtonHover}
+                              onMouseLeave={handleButtonLeave}
+                            >
+                              <i className="fas fa-trash-alt w-4 h-4"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isSuccessModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+          <div
+            ref={modalRef}
+            className="bg-gray-800 w-full max-w-md rounded-xl shadow-2xl border border-gray-700 p-6"
+            data-aos="zoom-in"
+          >
             <div className="flex items-center justify-center mb-4">
-              <div className="bg-green-500/20 p-3 rounded-full">
-                <svg
-                  className="w-8 h-8 text-green-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
+              <div className="bg-green-600 p-3 rounded-full">
+                <i className="fas fa-check w-8 h-8 text-white"></i>
               </div>
             </div>
             <h3 className="text-xl font-bold text-center text-green-400">
-              Success!
+              Thành công!
             </h3>
             <p className="text-gray-300 text-center mt-2">{modalMessage}</p>
             <button
               onClick={() => setIsSuccessModalOpen(false)}
-              className="w-full mt-6 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-all"
+              className="w-full mt-6 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-all cursor-pointer"
+              onMouseEnter={handleButtonHover}
+              onMouseLeave={handleButtonLeave}
             >
               OK
             </button>
@@ -1005,31 +1270,23 @@ const Users = () => {
 
       {isErrorModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+          <div
+            ref={modalRef}
+            className="bg-gray-800 w-full max-w-md rounded-xl shadow-2xl border border-gray-700 p-6"
+            data-aos="zoom-in"
+          >
             <div className="flex items-center justify-center mb-4">
-              <div className="bg-red-500/20 p-3 rounded-full">
-                <svg
-                  className="w-8 h-8 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+              <div className="bg-red-600 p-3 rounded-full">
+                <i className="fas fa-times w-8 h-8 text-white"></i>
               </div>
             </div>
-            <h3 className="text-xl font-bold text-center text-red-400">
-              Error!
-            </h3>
+            <h3 className="text-xl font-bold text-center text-red-400">Lỗi!</h3>
             <p className="text-gray-300 text-center mt-2">{modalMessage}</p>
             <button
               onClick={() => setIsErrorModalOpen(false)}
-              className="w-full mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all"
+              className="w-full mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all cursor-pointer"
+              onMouseEnter={handleButtonHover}
+              onMouseLeave={handleButtonLeave}
             >
               OK
             </button>
@@ -1039,42 +1296,38 @@ const Users = () => {
 
       {isConfirmDeleteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-gray-900 w-full max-w-md rounded-xl shadow-2xl border border-gray-800 p-6 animate-bounce-in">
+          <div
+            ref={modalRef}
+            className="bg-gray-800 w-full max-w-md rounded-xl shadow-2xl border border-gray-700 p-6"
+            data-aos="zoom-in"
+          >
             <div className="flex items-center justify-center mb-4">
-              <div className="bg-yellow-500/20 p-3 rounded-full">
-                <svg
-                  className="w-8 h-8 text-yellow-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+              <div className="bg-yellow-600 p-3 rounded-full">
+                <i className="fas fa-exclamation-circle w-8 h-8 text-white"></i>
               </div>
             </div>
             <h3 className="text-xl font-bold text-center text-yellow-400">
-              Confirm Delete
+              Xác nhận xóa
             </h3>
             <p className="text-gray-300 text-center mt-2">
-              Bạn có muốn xóa tài khoản này không?
+              Bạn có chắc muốn xóa người dùng này?
             </p>
             <div className="mt-6 flex space-x-4">
               <button
                 onClick={confirmDeleteUser}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all"
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition-all cursor-pointer"
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
               >
                 Có
               </button>
               <button
                 onClick={() => setIsConfirmDeleteModalOpen(false)}
-                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all"
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-all cursor-pointer"
+                onMouseEnter={handleButtonHover}
+                onMouseLeave={handleButtonLeave}
               >
-                Trở lại
+                Hủy
               </button>
             </div>
           </div>
