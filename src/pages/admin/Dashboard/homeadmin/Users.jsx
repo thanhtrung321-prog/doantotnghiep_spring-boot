@@ -455,7 +455,7 @@ const Users = () => {
                 </p>
               </div>
               <div className="bg-blue-500 p-3 rounded-full">
-                <i className="fas fa-user w-6 h-6 text-white"></i>
+                <i className="fas fa-user p-3 text-2xl text-white"></i>
               </div>
             </div>
           </div>
@@ -474,7 +474,7 @@ const Users = () => {
                 </p>
               </div>
               <div className="bg-orange-500 p-3 rounded-full">
-                <i className="fas fa-briefcase w-6 h-6 text-white"></i>
+                <i className="fas fa-briefcase p-3 text-2xl text-white"></i>
               </div>
             </div>
           </div>
@@ -493,7 +493,7 @@ const Users = () => {
                 </p>
               </div>
               <div className="bg-red-600 p-3 rounded-full">
-                <i className="fas fa-shield-alt w-6 h-6 text-white"></i>
+                <i className="fas fa-shield-alt p-3 text-2xl text-white"></i>
               </div>
             </div>
           </div>
@@ -512,7 +512,7 @@ const Users = () => {
                 </p>
               </div>
               <div className="bg-purple-600 p-3 rounded-full">
-                <i className="fas fa-store w-6 h-6 text-white"></i>
+                <i className="fas fa-store p-3 text-2xl text-white"></i>
               </div>
             </div>
           </div>
@@ -1249,7 +1249,7 @@ const Users = () => {
           >
             <div className="flex items-center justify-center mb-4">
               <div className="bg-green-600 p-3 rounded-full">
-                <i className="fas fa-check w-8 h-8 text-white"></i>
+                <i className="fas fa-check w-4 h-4 text-white"></i>
               </div>
             </div>
             <h3 className="text-xl font-bold text-center text-green-400">
@@ -1277,7 +1277,7 @@ const Users = () => {
           >
             <div className="flex items-center justify-center mb-4">
               <div className="bg-red-600 p-3 rounded-full">
-                <i className="fas fa-times w-8 h-8 text-white"></i>
+                <i className="fas fa-times w-4 h-4 text-white"></i>
               </div>
             </div>
             <h3 className="text-xl font-bold text-center text-red-400">Lỗi!</h3>
@@ -1303,7 +1303,7 @@ const Users = () => {
           >
             <div className="flex items-center justify-center mb-4">
               <div className="bg-yellow-600 p-3 rounded-full">
-                <i className="fas fa-exclamation-circle w-8 h-8 text-white"></i>
+                <i className="fas fa-exclamation-circle p-3 text-2xl text-white"></i>
               </div>
             </div>
             <h3 className="text-xl font-bold text-center text-yellow-400">
