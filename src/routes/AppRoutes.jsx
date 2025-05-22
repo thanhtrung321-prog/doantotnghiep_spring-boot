@@ -18,7 +18,7 @@ import AdminDashboard from "../pages/Dashboard/AdminDashboard";
 import StaffDashboard from "../pages/Dashboard/StaffDashboard";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
-import Profile from "../pages/admin/Dashboard/homeadmin/Profile";
+// import Profile from "../pages/admin/Dashboard/homeadmin/Profile";
 
 // Component ProtectedRoute để bảo vệ các route dựa trên vai trò
 const ProtectedRoute = ({ allowedRoles, children }) => {

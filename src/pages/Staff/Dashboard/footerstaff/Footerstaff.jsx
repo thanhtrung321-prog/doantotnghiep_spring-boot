@@ -33,7 +33,7 @@ const Footerstaff = () => {
           {/* Thông tin hệ thống */}
           <div className="text-sm">
             <h3 className="font-semibold text-orange-300 text-lg">
-              Beauty Salon - Admin Dashboard
+              Beauty Salon - Lịch làm việc của Nhân Viên
             </h3>
             <p className="text-indigo-200">Hệ thống quản trị salon</p>
           </div>

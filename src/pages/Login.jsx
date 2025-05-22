@@ -86,6 +86,8 @@ const Login = () => {
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
       localStorage.setItem("token", user.token);
+      //lưu tokens của staff vào localStorage
+      localStorage.setItem("userId", user.id); // Store user ID
       setShowSuccessModal(true);
 
       setTimeout(() => {
