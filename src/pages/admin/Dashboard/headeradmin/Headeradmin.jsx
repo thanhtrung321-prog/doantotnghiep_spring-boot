@@ -1,16 +1,19 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; // Thêm useNavigate để điều hướng
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 const HeaderAdmin = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [filteredServices, setFilteredServices] = useState([]);
+  const [activeService, setActiveService] = useState("dashboard");
 
-  // Lấy thông tin người dùng từ localStorage
   const user = JSON.parse(localStorage.getItem("user")) || {};
-  const navigate = useNavigate(); // Hook để điều hướng
+  const navigate = useNavigate();
+  const searchRef = useRef(null);
 
-  // Services list for admin navigation
   const services = [
     {
       id: "booking",
@@ -50,13 +53,52 @@ const HeaderAdmin = () => {
     },
   ];
 
-  const [activeService, setActiveService] = useState("dashboard");
+  // Filter services based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredServices(services);
+    } else {
+      const filtered = services.filter((service) =>
+        service.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredServices(filtered);
+    }
+  }, [searchQuery]);
 
-  // Hàm xử lý đăng xuất
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchOpen(false);
+      }
+      if (!event.target.closest("[data-profile]")) {
+        setIsProfileOpen(false);
+      }
+      if (!event.target.closest("[data-notifications]")) {
+        setIsNotificationsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleServiceClick = (serviceId) => {
+    setActiveService(serviceId);
+    setSearchQuery("");
+    setIsSearchOpen(false);
+    navigate(`/admin/${serviceId}`);
+  };
+
+  const handleKeyDown = (e, serviceId) => {
+    if (e.key === "Enter") {
+      handleServiceClick(serviceId);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    navigate("/login"); // Chuyển hướng về trang đăng nhập
+    navigate("/login");
   };
 
   return (
@@ -69,7 +111,6 @@ const HeaderAdmin = () => {
               className="p-2 rounded-md text-white lg:hidden hover:bg-indigo-800 focus:outline-none"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              {/* Menu Icon */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-6 w-6"
@@ -180,7 +221,7 @@ const HeaderAdmin = () => {
           {/* Right side - Search and User Actions */}
           <div className="flex items-center space-x-4">
             {/* Search */}
-            <div className="hidden md:block">
+            <div className="hidden md:block relative" ref={searchRef}>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg
@@ -202,12 +243,54 @@ const HeaderAdmin = () => {
                   className="block w-full pl-10 pr-3 py-2 border border-transparent rounded-md leading-5 bg-indigo-800 bg-opacity-25 text-white placeholder-gray-300 focus:outline-none focus:bg-indigo-700 focus:ring-0 focus:border-transparent sm:text-sm"
                   placeholder="Search services..."
                   type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchOpen(true)}
+                  aria-label="Search services"
                 />
               </div>
+
+              {isSearchOpen && filteredServices.length > 0 && (
+                <div className="origin-top-right absolute right-0 mt-2 w-full rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 transition-all duration-200 transform scale-95 opacity-0 animate-[dropdown_200ms_ease-out_forwards]">
+                  <div className="py-1">
+                    {filteredServices.map((service) => (
+                      <div
+                        key={service.id}
+                        className={`px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center cursor-pointer ${
+                          activeService === service.id ? "bg-purple-100" : ""
+                        }`}
+                        onClick={() => handleServiceClick(service.id)}
+                        onKeyDown={(e) => handleKeyDown(e, service.id)}
+                        role="option"
+                        tabIndex={0}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="mr-3 h-5 w-5 text-gray-500"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d={service.icon}
+                          />
+                        </svg>
+                        <span>{service.name}</span>
+                        {service.isComplete && (
+                          <span className="ml-2 h-2 w-2 rounded-full bg-green-400" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Notifications */}
-            <div className="relative">
+            <div className="relative" data-notifications>
               <button
                 className="p-2 rounded-full text-gray-200 hover:bg-indigo-800 focus:outline-none relative"
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
@@ -355,7 +438,7 @@ const HeaderAdmin = () => {
             </div>
 
             {/* Profile dropdown */}
-            <div className="relative">
+            <div className="relative" data-profile>
               <button
                 className="flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500"
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -382,17 +465,15 @@ const HeaderAdmin = () => {
                 <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
                   <div className="py-3 px-4 border-b border-gray-100 bg-gray-50 rounded-t-md">
                     <p className="text-sm font-medium text-gray-800">
-                      {user.fullName || "Unknown User"}{" "}
-                      {/* Hiển thị tên người dùng */}
+                      {user.fullName || "Unknown User"}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {user.email || "No email available"}{" "}
-                      {/* Hiển thị email */}
+                      {user.email || "No email available"}
                     </p>
                   </div>
                   <div className="py-1" role="menu" aria-orientation="vertical">
                     <Link
-                      to="/admin/profile" // Chuyển đến trang profile chung
+                      to="/admin/profile"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                       role="menuitem"
                     >
@@ -440,7 +521,7 @@ const HeaderAdmin = () => {
                       Cài Đặt
                     </Link>
                     <button
-                      onClick={handleLogout} // Gọi hàm đăng xuất
+                      onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 hover:text-red-700 flex items-center"
                       role="menuitem"
                     >
@@ -536,6 +617,14 @@ const HeaderAdmin = () => {
           ))}
         </div>
       </div>
+
+      {/* Custom Animation Keyframes */}
+      <style>{`
+        @keyframes dropdown {
+          0% { transform: scale(0.95); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </header>
   );
 };

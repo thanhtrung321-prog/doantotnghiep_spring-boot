@@ -75,6 +75,8 @@ const Payments = () => {
   const [newPaymentStatus, setNewPaymentStatus] = useState("");
   const paymentsPerPage = 5;
   const searchInputRef = useRef(null);
+  const progressBarRef = useRef(null);
+  const progressTextRef = useRef(null);
 
   const chartRef = useRef(null);
   const statsChartRef = useRef(null);
@@ -89,15 +91,31 @@ const Payments = () => {
       setIsLoading(true);
       try {
         const { payments, stats } = await fetchPayments();
-        // Log payments to debug data issues
         console.log("Loaded payments:", payments);
+        // Animate progress bar from 0% to 100% over 0.8s
+        gsap.to(progressBarRef.current, {
+          width: "100%",
+          duration: 0.8,
+          ease: "power2.out",
+        });
+        gsap.to(progressTextRef.current, {
+          innerHTML: 100,
+          duration: 0.8,
+          ease: "power2.out",
+          snap: { innerHTML: 1 },
+          onUpdate: function () {
+            progressTextRef.current.innerHTML = Math.round(
+              progressTextRef.current.innerHTML
+            );
+          },
+        });
         setTimeout(() => {
           setPayments(payments);
           setFilteredPayments(payments);
           setOriginalPayments(payments);
           setStats({ ...stats, bookingCount: payments.length });
           setIsLoading(false);
-        }, 500); // 0.5s loading
+        }, 800); // Match animation duration
       } catch (error) {
         console.error("Không thể tải danh sách thanh toán:", error);
         toast.error("Không thể tải dữ liệu thanh toán");
@@ -129,13 +147,11 @@ const Payments = () => {
     }
 
     const filtered = sortedPayments.filter((payment) => {
-      // Ensure fields are strings, fallback to "" if undefined/null
       const salonName = payment.salon_name ? String(payment.salon_name) : "";
       const userName = payment.user_name ? String(payment.user_name) : "";
       const paymentMethod = getPaymentMethodLabel(payment.payment_method) || "";
       const paymentId = payment.id ? String(payment.id) : "";
 
-      // Log payment to debug problematic entries
       if (!salonName || !userName) {
         console.warn("Invalid payment data:", payment);
       }
@@ -151,7 +167,6 @@ const Payments = () => {
     setFilteredPayments(filtered);
     setCurrentPage(1);
 
-    // Highlight search bar if results are found
     if (searchQuery && filtered.length > 0 && searchInputRef.current) {
       searchInputRef.current.focus();
       gsap.to(searchInputRef.current, {
@@ -475,14 +490,39 @@ const Payments = () => {
             .rgb-message {
               animation: rgbText 3s infinite;
             }
+            .progress-bar-container {
+              width: 300px;
+              height: 16px;
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 8px;
+              overflow: hidden;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
+            .progress-bar {
+              height: 100%;
+              width: 0%;
+              background: linear-gradient(90deg, #7C3AED, #EC4899);
+              border-radius: 8px;
+              transition: width 0.8s ease;
+            }
+            .progress-text {
+              font-size: 1.25rem;
+              font-weight: 600;
+              color: #fff;
+              text-shadow: 0 0 8px rgba(236, 72, 153, 0.8);
+            }
           `}
         </style>
 
         {isLoading && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="mt-4 text-white font-semibold">Đang tải...</p>
+            <div className="flex flex-col items-center gap-4">
+              <p ref={progressTextRef} className="progress-text">
+                0%
+              </p>
+              <div className="progress-bar-container">
+                <div ref={progressBarRef} className="progress-bar"></div>
+              </div>
             </div>
           </div>
         )}
