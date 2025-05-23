@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { gsap } from "gsap";
@@ -13,7 +13,7 @@ const HeaderStaff = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSalonModalOpen, setIsSalonModalOpen] = useState(false);
-  const [imageMode, setImageMode] = useState("row"); // row or slider
+  const [imageMode, setImageMode] = useState("row");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [user, setUser] = useState(null);
   const [salon, setSalon] = useState(null);
@@ -21,17 +21,6 @@ const HeaderStaff = () => {
   const navigate = useNavigate();
   const profileModalRef = useRef(null);
   const salonModalRef = useRef(null);
-
-  // Navigation items for staff
-  const staffMenu = [
-    {
-      id: "booking",
-      name: "Lịch làm việc",
-      icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-    },
-  ];
-
-  const [activeItem, setActiveItem] = useState("booking");
 
   // Initialize AOS
   useEffect(() => {
@@ -62,10 +51,8 @@ const HeaderStaff = () => {
           setSalon(salonData);
         }
       } catch (error) {
-        console.error("Lỗi khi tải thông tin người dùng hoặc salon:", error);
-        toast.error(
-          error.message || "Không thể tải thông tin người dùng hoặc salon"
-        );
+        console.error("Lỗi khi tải dữ liệu:", error);
+        toast.error(error.message || "Không thể tải dữ liệu");
       } finally {
         setIsLoading(false);
       }
@@ -135,24 +122,16 @@ const HeaderStaff = () => {
     setIsProfileModalOpen(true);
   };
 
-  const handleCloseProfileModal = () => {
-    setIsProfileModalOpen(false);
-  };
-
   const handleSalonDetailsClick = () => {
     setIsProfileOpen(false);
     setIsSalonModalOpen(true);
-    setImageMode("row"); // Default to row mode
-    setCurrentImageIndex(0); // Reset slider index
-  };
-
-  const handleCloseSalonModal = () => {
-    setIsSalonModalOpen(false);
+    setImageMode("row");
+    setCurrentImageIndex(0);
   };
 
   const handleImageModeToggle = (mode) => {
     setImageMode(mode);
-    setCurrentImageIndex(0); // Reset slider index when switching modes
+    setCurrentImageIndex(0);
   };
 
   const handlePrevImage = () => {
@@ -171,6 +150,7 @@ const HeaderStaff = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     localStorage.removeItem("userId");
+    localStorage.removeItem("salonId");
     toast.success("Đăng xuất thành công!");
     setIsProfileOpen(false);
     navigate("/login");
@@ -181,7 +161,6 @@ const HeaderStaff = () => {
       <header className="bg-gradient-to-r from-blue-600 to-indigo-700 shadow-lg">
         <div className="max-w-full mx-auto px-4">
           <div className="flex justify-between items-center h-16">
-            {/* Left side - Logo and Menu Toggle */}
             <div className="flex items-center">
               <button
                 className="p-2 rounded-md text-white lg:hidden hover:bg-indigo-600 focus:outline-none"
@@ -229,37 +208,6 @@ const HeaderStaff = () => {
                   </div>
                 </div>
               </div>
-
-              <nav className="hidden lg:ml-8 lg:flex lg:space-x-1">
-                {staffMenu.map((item) => (
-                  <Link
-                    key={item.id}
-                    to={`/staff/${item.id}`}
-                    onClick={() => setActiveItem(item.id)}
-                    className={`${
-                      activeItem === item.id
-                        ? "border-blue-300 text-white"
-                        : "border-transparent text-gray-200 hover:border-gray-300 hover:text-white"
-                    } group flex items-center px-3 py-2 border-b-2 text-sm font-medium transition-colors`}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="mr-1.5 h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d={item.icon}
-                      />
-                    </svg>
-                    {item.name}
-                  </Link>
-                ))}
-              </nav>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -378,36 +326,72 @@ const HeaderStaff = () => {
 
         <div className={`lg:hidden ${isMobileMenuOpen ? "block" : "hidden"}`}>
           <div className="pt-2 pb-3 space-y-1 bg-indigo-700 border-t border-indigo-600">
-            {staffMenu.map((item) => (
-              <Link
-                key={item.id}
-                to={`/staff/${item.id}`}
-                onClick={() => setActiveItem(item.id)}
-                className={`${
-                  activeItem === item.id
-                    ? "bg-blue-600 text-white border-blue-300"
-                    : "text-gray-200 hover:bg-blue-500 hover:text-white border-transparent"
-                } block pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors`}
-              >
-                <div className="flex items-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="mr-3 h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d={item.icon}
-                    />
-                  </svg>
-                  {item.name}
-                </div>
-              </Link>
-            ))}
+            <button
+              onClick={handleProfileClick}
+              className="block pl-3 pr-4 py-2 border-l-4 text-base font-medium text-gray-200 hover:bg-blue-500 hover:text-white border-transparent"
+            >
+              <div className="flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="mr-3 h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+                Hồ sơ của bạn
+              </div>
+            </button>
+            <button
+              onClick={handleSalonDetailsClick}
+              className="block pl-3 pr-4 py-2 border-l-4 text-base font-medium text-gray-200 hover:bg-blue-500 hover:text-white border-transparent"
+            >
+              <div className="flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="mr-3 h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a2 2 0 012-2h2a2 2 0 012 2v5m-4 0h4"
+                  />
+                </svg>
+                Chi tiết Salon
+              </div>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="block pl-3 pr-4 py-2 border-l-4 text-base font-medium text-red-600 hover:bg-gray-100 hover:text-red-700 border-transparent"
+            >
+              <div className="flex items-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="mr-3 h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                Đăng xuất
+              </div>
+            </button>
           </div>
         </div>
       </header>
@@ -439,31 +423,31 @@ const HeaderStaff = () => {
               ) : user ? (
                 <div className="space-y-3">
                   <div data-aos="fade-up" data-aos-delay="200">
-                    <p className="text-sm text-blue-200">Họ và tên</p>
+                    <p className="text-sm text-blue-300">Họ và tên</p>
                     <p className="font-medium">
                       {user.fullName || "Không xác định"}
                     </p>
                   </div>
                   <div data-aos="fade-up" data-aos-delay="300">
-                    <p className="text-sm text-blue-200">Email</p>
+                    <p className="text-sm text-blue-300">Email</p>
                     <p className="font-medium">
                       {user.email || "Không xác định"}
                     </p>
                   </div>
                   <div data-aos="fade-up" data-aos-delay="400">
-                    <p className="text-sm text-blue-200">Số điện thoại</p>
+                    <p className="text-sm text-blue-300">Số điện thoại</p>
                     <p className="font-medium">
                       {user.phone || "Không xác định"}
                     </p>
                   </div>
                   <div data-aos="fade-up" data-aos-delay="500">
-                    <p className="text-sm text-blue-200">Vai trò</p>
+                    <p className="text-sm text-blue-300">Vai trò</p>
                     <p className="font-medium">
                       {user.role || "Không xác định"}
                     </p>
                   </div>
                   <div data-aos="fade-up" data-aos-delay="600">
-                    <p className="text-sm text-blue-200">Ngày tạo</p>
+                    <p className="text-sm text-blue-300">Ngày tạo</p>
                     <p className="font-medium">
                       {user.createdAt
                         ? new Date(user.createdAt).toLocaleDateString("vi-VN")
@@ -471,7 +455,7 @@ const HeaderStaff = () => {
                     </p>
                   </div>
                   <div data-aos="fade-up" data-aos-delay="700">
-                    <p className="text-sm text-blue-200">Cập nhật lần cuối</p>
+                    <p className="text-sm text-blue-300">Cập nhật lần cuối</p>
                     <p className="font-medium">
                       {user.updatedAt
                         ? new Date(user.updatedAt).toLocaleDateString("vi-VN")
@@ -489,7 +473,7 @@ const HeaderStaff = () => {
                 </p>
               )}
               <button
-                onClick={handleCloseProfileModal}
+                onClick={() => setIsProfileModalOpen(false)}
                 className="mt-6 w-full bg-blue-400 hover:bg-blue-500 text-white font-medium py-2 rounded-lg transition-colors"
                 data-aos="fade-up"
                 data-aos-delay="800"
@@ -527,7 +511,6 @@ const HeaderStaff = () => {
                 </p>
               ) : salon ? (
                 <div className="space-y-6">
-                  {/* Salon Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div data-aos="fade-up" data-aos-delay="200">
                       <p className="text-sm text-blue-300">Tên Salon</p>
@@ -572,8 +555,6 @@ const HeaderStaff = () => {
                       </p>
                     </div>
                   </div>
-
-                  {/* Image Mode Toggle */}
                   <div
                     className="flex justify-center space-x-4"
                     data-aos="fade-up"
@@ -600,8 +581,6 @@ const HeaderStaff = () => {
                       Chế độ Trình chiếu
                     </button>
                   </div>
-
-                  {/* Images */}
                   <div data-aos="fade-in" data-aos-delay="1000">
                     {salon.images && salon.images.length > 0 ? (
                       imageMode === "row" ? (
@@ -657,7 +636,7 @@ const HeaderStaff = () => {
                 </p>
               )}
               <button
-                onClick={handleCloseSalonModal}
+                onClick={() => setIsSalonModalOpen(false)}
                 className="mt-6 w-full bg-blue-400 hover:bg-blue-500 text-white font-medium py-2 rounded-lg transition-colors"
                 data-aos="fade-up"
                 data-aos-delay="1100"

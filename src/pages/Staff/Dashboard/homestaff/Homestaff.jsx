@@ -1,9 +1,23 @@
-import React, { useState, useEffect, useRef } from "react";
-import * as THREE from "three";
+import React, { useState, useEffect } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
+import "moment/locale/vi"; // Set moment to Vietnamese locale
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import {
+  fetchStaffBookings,
+  fetchCustomer,
+  fetchService,
+  updateBookingStatus,
+  fetchUser,
+  fetchSalon,
+} from "../../Dashboard/api/staffhome";
+import AOS from "aos";
+import "aos/dist/aos.css";
+import { gsap } from "gsap";
 
+moment.locale("vi"); // Ensure calendar displays in Vietnamese
 const localizer = momentLocalizer(moment);
 
 const Homestaff = () => {
@@ -17,161 +31,161 @@ const Homestaff = () => {
     end: moment().format("YYYY-MM-DD"),
   });
   const [statusFilter, setStatusFilter] = useState("all");
-  const threeCanvasRef = useRef(null);
+  const [user, setUser] = useState(null);
+  const [salon, setSalon] = useState(null);
+  const [isFetching, setIsFetching] = useState(true);
+  const [showDetails, setShowDetails] = useState(null);
 
-  // Mock data
+  // Initialize AOS
   useEffect(() => {
-    setTimeout(() => {
-      const mockBookings = [
-        {
-          id: 1,
-          customerName: "Lisa Johnson",
-          serviceName: "Hair Coloring + Cut",
-          serviceId: 101,
-          startTime: moment().hour(10).minute(0).second(0).toDate(),
-          endTime: moment().hour(12).minute(0).second(0).toDate(),
-          status: "confirmed",
-          notes: "Blonde highlights, trim ends only",
-          customerPhone: "123-456-7890",
-        },
-        {
-          id: 2,
-          customerName: "Michael Smith",
-          serviceName: "Men's Haircut",
-          serviceId: 102,
-          startTime: moment()
-            .add(1, "days")
-            .hour(14)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          endTime: moment()
-            .add(1, "days")
-            .hour(15)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          status: "pending",
-          notes: "Short on sides, leave top longer",
-          customerPhone: "234-567-8901",
-        },
-        {
-          id: 3,
-          customerName: "Jennifer Davis",
-          serviceName: "Manicure & Pedicure",
-          serviceId: 103,
-          startTime: moment()
-            .subtract(1, "days")
-            .hour(11)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          endTime: moment()
-            .subtract(1, "days")
-            .hour(13)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          status: "canceled",
-          notes: "Red polish for nails",
-          customerPhone: "345-678-9012",
-        },
-        {
-          id: 4,
-          customerName: "Robert Williams",
-          serviceName: "Beard Trim",
-          serviceId: 104,
-          startTime: moment().hour(16).minute(0).second(0).toDate(),
-          endTime: moment().hour(16).minute(30).second(0).toDate(),
-          status: "confirmed",
-          notes: "Clean shape, not too short",
-          customerPhone: "456-789-0123",
-        },
-        {
-          id: 5,
-          customerName: "Sarah Miller",
-          serviceName: "Full Facial",
-          serviceId: 105,
-          startTime: moment()
-            .add(2, "days")
-            .hour(13)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          endTime: moment()
-            .add(2, "days")
-            .hour(14)
-            .minute(30)
-            .second(0)
-            .toDate(),
-          status: "pending",
-          notes: "Sensitive skin, avoid fragrance",
-          customerPhone: "567-890-1234",
-        },
-        {
-          id: 6,
-          customerName: "David Brown",
-          serviceName: "Hair Color Touch-up",
-          serviceId: 106,
-          startTime: moment()
-            .add(1, "days")
-            .hour(10)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          endTime: moment()
-            .add(1, "days")
-            .hour(11)
-            .minute(30)
-            .second(0)
-            .toDate(),
-          status: "confirmed",
-          notes: "Match previous color (dark brown)",
-          customerPhone: "678-901-2345",
-        },
-        {
-          id: 7,
-          customerName: "Emily Wilson",
-          serviceName: "Hair Styling",
-          serviceId: 107,
-          startTime: moment()
-            .add(3, "days")
-            .hour(15)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          endTime: moment()
-            .add(3, "days")
-            .hour(16)
-            .minute(0)
-            .second(0)
-            .toDate(),
-          status: "pending",
-          notes: "Wedding guest hairstyle",
-          customerPhone: "789-012-3456",
-        },
-        {
-          id: 8,
-          customerName: "James Taylor",
-          serviceName: "Scalp Treatment",
-          serviceId: 108,
-          startTime: moment().hour(9).minute(0).second(0).toDate(),
-          endTime: moment().hour(10).minute(0).second(0).toDate(),
-          status: "confirmed",
-          notes: "Experiencing dry scalp",
-          customerPhone: "890-123-4567",
-        },
-      ];
-
-      setBookings(mockBookings);
-      setFilteredBookings(mockBookings);
-      setLoading(false);
-    }, 1000);
+    AOS.init({ duration: 1000, once: true });
   }, []);
+
+  // GSAP text animation for header
+  useEffect(() => {
+    gsap.fromTo(
+      ".header-text",
+      { opacity: 0, y: -50 },
+      { opacity: 1, y: 0, duration: 1, ease: "power3.out" }
+    );
+  }, []);
+
+  // Fetch user and salon data
+  useEffect(() => {
+    const fetchUserAndSalon = async () => {
+      setIsFetching(true);
+      try {
+        const userId = localStorage.getItem("userId");
+        const token = localStorage.getItem("token");
+
+        if (!userId || !token) {
+          throw new Error("Vui lòng đăng nhập để xem bảng điều khiển");
+        }
+
+        const userData = await fetchUser(userId, token);
+        setUser(userData);
+
+        if (userData.salonId) {
+          const salonData = await fetchSalon(userData.salonId);
+          setSalon(salonData);
+        }
+      } catch (error) {
+        console.error("Lỗi khi lấy dữ liệu người dùng/salon:", error);
+        toast.error(
+          error.message || "Không thể tải dữ liệu người dùng hoặc salon"
+        );
+      } finally {
+        setIsFetching(false);
+      }
+    };
+
+    fetchUserAndSalon();
+  }, []);
+
+  // Normalize status from backend to frontend
+  const normalizeStatus = (status) => {
+    switch (status.toUpperCase()) {
+      case "COMPLETED":
+      case "SUCCESS":
+        return "confirmed";
+      case "CANCELLED":
+        return "canceled";
+      case "PENDING":
+        return "pending";
+      case "CONFIRMED":
+        return "confirmed";
+      default:
+        return status.toLowerCase();
+    }
+  };
+
+  // Fetch bookings and enrich with customer and service data
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (!user?.id || !localStorage.getItem("token")) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        const rawBookings = await fetchStaffBookings(user.id, token);
+
+        if (!rawBookings || rawBookings.length === 0) {
+          setBookings([]);
+          setFilteredBookings([]);
+          setLoading(false);
+          return;
+        }
+
+        const enrichedBookings = await Promise.all(
+          rawBookings.map(async (booking) => {
+            try {
+              const customer = await fetchCustomer(booking.customerId, token);
+              const servicePromises = (booking.serviceIds || []).map(
+                async (serviceId) => {
+                  try {
+                    return await fetchService(serviceId);
+                  } catch (error) {
+                    console.error(
+                      `Lỗi khi lấy dịch vụ ${serviceId}:`,
+                      error.message
+                    );
+                    return null;
+                  }
+                }
+              );
+              const services = (await Promise.all(servicePromises)).filter(
+                (s) => s !== null
+              );
+
+              const serviceName =
+                services.length > 0
+                  ? services.map((s) => s.name.split("|")[0]).join(", ")
+                  : "Dịch vụ không xác định";
+
+              return {
+                id: booking.id,
+                customerName: customer.fullName || "Khách hàng không xác định",
+                customerPhone: customer.phone || "N/A",
+                serviceName,
+                serviceIds: booking.serviceIds || [],
+                services, // Store full service details for modal
+                startTime: new Date(booking.startTime),
+                endTime: new Date(booking.endTime),
+                status: normalizeStatus(booking.status),
+                notes: booking.notes || "Không có ghi chú",
+              };
+            } catch (error) {
+              console.error(`Lỗi khi xử lý đặt lịch ${booking.id}:`, error);
+              return null;
+            }
+          })
+        );
+
+        const validBookings = enrichedBookings.filter((b) => b !== null);
+        setBookings(validBookings);
+        setFilteredBookings(validBookings);
+      } catch (error) {
+        console.error("Lỗi khi lấy danh sách đặt lịch:", error);
+        toast.error(error.message || "Không thể tải danh sách đặt lịch");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchBookings();
+    }
+  }, [user]);
 
   // Filter bookings based on date and status
   useEffect(() => {
-    if (bookings.length === 0) return;
+    if (bookings.length === 0) {
+      setFilteredBookings([]);
+      return;
+    }
 
     let filtered = [...bookings];
     const today = moment().startOf("day");
@@ -225,112 +239,20 @@ const Homestaff = () => {
     setFilteredBookings(filtered);
   }, [bookings, dateFilter, statusFilter, customDateRange]);
 
-  // Initialize Three.js animation (Snowfall)
-  useEffect(() => {
-    if (!threeCanvasRef.current) return;
-
-    // Scene setup
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / 150,
-      0.1,
-      1000
-    );
-    const renderer = new THREE.WebGLRenderer({
-      canvas: threeCanvasRef.current,
-      alpha: true,
-      antialias: true,
-    });
-
-    renderer.setSize(window.innerWidth, 150);
-    renderer.setClearColor(0x000000, 0);
-
-    // Snow particles
-    const snowCount = 1000;
-    const snowGeometry = new THREE.BufferGeometry();
-    const snowPositions = new Float32Array(snowCount * 3);
-    const snowVelocities = new Float32Array(snowCount * 3); // Velocity for each snowflake
-
-    // Initialize snowflake positions and velocities
-    for (let i = 0; i < snowCount; i++) {
-      snowPositions[i * 3] = (Math.random() - 0.5) * 20; // x
-      snowPositions[i * 3 + 1] = Math.random() * 10; // y (start above canvas)
-      snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 20; // z
-
-      snowVelocities[i * 3] = (Math.random() - 0.5) * 0.02; // x velocity (wind)
-      snowVelocities[i * 3 + 1] = -Math.random() * 0.05 - 0.05; // y velocity (falling)
-      snowVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02; // z velocity
-    }
-
-    snowGeometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(snowPositions, 3)
-    );
-
-    const snowMaterial = new THREE.PointsMaterial({
-      size: 0.05,
-      color: 0xffffff, // White snowflakes
-      transparent: true,
-      opacity: 0.8,
-    });
-
-    const snowMesh = new THREE.Points(snowGeometry, snowMaterial);
-    scene.add(snowMesh);
-
-    // Camera positioning
-    camera.position.z = 5;
-
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate);
-
-      // Update snowflake positions
-      const positions = snowMesh.geometry.attributes.position.array;
-      for (let i = 0; i < snowCount; i++) {
-        positions[i * 3] += snowVelocities[i * 3]; // Update x
-        positions[i * 3 + 1] += snowVelocities[i * 3 + 1]; // Update y
-        positions[i * 3 + 2] += snowVelocities[i * 3 + 2]; // Update z
-
-        // Reset snowflake to top if it falls below canvas
-        if (positions[i * 3 + 1] < -5) {
-          positions[i * 3] = (Math.random() - 0.5) * 20; // Reset x
-          positions[i * 3 + 1] = 10; // Reset y to top
-          positions[i * 3 + 2] = (Math.random() - 0.5) * 20; // Reset z
-        }
-      }
-
-      snowMesh.geometry.attributes.position.needsUpdate = true;
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    // Handle window resize
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / 150;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, 150);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      snowGeometry.dispose();
-      snowMaterial.dispose();
-      renderer.dispose();
-    };
-  }, []);
-
   // Handle booking status change
-  const handleStatusChange = (bookingId, newStatus) => {
-    const updatedBookings = bookings.map((booking) =>
-      booking.id === bookingId ? { ...booking, status: newStatus } : booking
-    );
-    setBookings(updatedBookings);
+  const handleStatusChange = async (bookingId, newStatus) => {
+    try {
+      const token = localStorage.getItem("token");
+      await updateBookingStatus(bookingId, newStatus.toUpperCase(), token);
+      const updatedBookings = bookings.map((booking) =>
+        booking.id === bookingId ? { ...booking, status: newStatus } : booking
+      );
+      setBookings(updatedBookings);
+      toast.success(`Cập nhật trạng thái đặt lịch thành ${newStatus}`);
+    } catch (error) {
+      console.error("Lỗi khi cập nhật trạng thái đặt lịch:", error);
+      toast.error(error.message || "Không thể cập nhật trạng thái đặt lịch");
+    }
   };
 
   // Format calendar events for react-big-calendar
@@ -348,7 +270,7 @@ const Homestaff = () => {
       case "confirmed":
         return "bg-green-500";
       case "pending":
-        return "bg-orange-500";
+        return "bg-blue-500";
       case "canceled":
         return "bg-red-500";
       default:
@@ -359,11 +281,13 @@ const Homestaff = () => {
   // Calendar event style renderer
   const eventStyleGetter = (event) => {
     let style = {
-      borderRadius: "4px",
+      borderRadius: "6px",
       opacity: 0.95,
       color: "white",
       border: "0px",
       display: "block",
+      fontSize: "0.9rem",
+      padding: "4px 8px",
     };
 
     switch (event.status) {
@@ -371,7 +295,7 @@ const Homestaff = () => {
         style.backgroundColor = "#059669";
         break;
       case "pending":
-        style.backgroundColor = "#F97316";
+        style.backgroundColor = "#3B82F6";
         break;
       case "canceled":
         style.backgroundColor = "#EF4444";
@@ -383,62 +307,112 @@ const Homestaff = () => {
     return { style };
   };
 
+  // Parse service steps
+  const parseSteps = (service) => {
+    const names = service.name.split("|");
+    const descriptions = service.description.split("|");
+    const images = service.image.split("|");
+    return names.map((name, index) => ({
+      name,
+      description: descriptions[index] || "Không có mô tả",
+      image: images[index] || "",
+    }));
+  };
+
+  // Preload images when modal opens
+  useEffect(() => {
+    if (showDetails) {
+      const imagesToPreload = [];
+      showDetails.services.forEach((service) => {
+        const steps = parseSteps(service);
+        steps.forEach((step) => {
+          if (step.image) {
+            imagesToPreload.push(
+              `http://localhost:8083/service-offering-images/${step.image}`
+            );
+          }
+        });
+      });
+
+      imagesToPreload.forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      });
+    }
+  }, [showDetails]);
+
+  // Status display in Vietnamese
+  const getStatusDisplay = (status) => {
+    switch (status) {
+      case "confirmed":
+        return "Đã xác nhận";
+      case "pending":
+        return "Đang chờ";
+      case "canceled":
+        return "Đã hủy";
+      default:
+        return status;
+    }
+  };
+
   return (
-    <div className="p-4 min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-      {/* 3D Background Effect */}
-      <canvas
-        ref={threeCanvasRef}
-        className="absolute top-0 left-0 w-full h-40 opacity-60 pointer-events-none"
-      />
+    <div className="p-4 min-h-screen bg-gray-900 text-white">
+      <ToastContainer position="bottom-right" autoClose={3000} />
 
       {/* Page Header */}
-      <div className="relative z-10 mb-8 text-center">
-        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-red-500">
-          Staff Dashboard
+      <div className="relative z-10 mb-8 text-center" data-aos="fade-up">
+        <h1 className="header-text text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-pink-500">
+          Bảng Điều Khiển Nhân Viên
         </h1>
-        <p className="text-gray-400 mt-2">
-          Manage your appointments and schedule
+        <p className="text-gray-300 mt-2">
+          Quản lý lịch hẹn và lịch làm việc của bạn
         </p>
       </div>
 
       {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
+        data-aos="fade-up"
+        data-aos-delay="100"
+      >
         {[
           {
-            title: "Today's Bookings",
+            title: "Lịch Hẹn Hôm Nay",
             count: bookings.filter((b) =>
               moment(b.startTime).isSame(moment(), "day")
             ).length,
             icon: "clock",
-            color: "from-orange-600 to-orange-500",
+            color: "from-cyan-500 to-blue-500",
           },
           {
-            title: "Pending Approval",
+            title: "Chờ Xác Nhận",
             count: bookings.filter((b) => b.status === "pending").length,
             icon: "hourglass",
-            color: "from-yellow-600 to-yellow-500",
+            color: "from-blue-500 to-indigo-500",
           },
           {
-            title: "Confirmed",
+            title: "Đã Xác Nhận",
             count: bookings.filter((b) => b.status === "confirmed").length,
             icon: "check",
-            color: "from-green-600 to-green-500",
+            color: "from-green-500 to-teal-500",
           },
           {
-            title: "Canceled",
+            title: "Đã Hủy",
             count: bookings.filter((b) => b.status === "canceled").length,
             icon: "x",
-            color: "from-red-600 to-red-500",
+            color: "from-red-500 to-pink-500",
           },
         ].map((stat, idx) => (
           <div
             key={idx}
             className="bg-gray-800 rounded-lg p-4 shadow-lg backdrop-blur-sm bg-opacity-80 border border-gray-700"
+            data-aos="zoom-in"
+            data-aos-delay={`${150 * (idx + 1)}`}
           >
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-gray-400 text-sm">{stat.title}</p>
-                <p className="text-2xl font-bold">{stat.count}</p>
+                <p className="text-gray-300 text-sm">{stat.title}</p>
+                <p className="text-2xl font-bold text-white">{stat.count}</p>
               </div>
               <div
                 className={`bg-gradient-to-br ${stat.color} rounded-full p-3 text-white shadow-lg`}
@@ -514,35 +488,39 @@ const Homestaff = () => {
       </div>
 
       {/* Filter Controls */}
-      <div className="mb-6 bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700">
+      <div
+        className="mb-6 bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-700"
+        data-aos="fade-up"
+        data-aos-delay="200"
+      >
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-400 mb-1">
-              Date Filter
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Bộ Lọc Ngày
             </label>
             <select
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
             >
-              <option value="all">All Dates</option>
-              <option value="today">Today</option>
-              <option value="tomorrow">Tomorrow</option>
-              <option value="thisWeek">This Week</option>
-              <option value="thisMonth">This Month</option>
-              <option value="custom">Custom Range</option>
+              <option value="all">Tất Cả Ngày</option>
+              <option value="today">Hôm Nay</option>
+              <option value="tomorrow">Ngày Mai</option>
+              <option value="thisWeek">Tuần Này</option>
+              <option value="thisMonth">Tháng Này</option>
+              <option value="custom">Khoảng Tùy Chỉnh</option>
             </select>
           </div>
 
           {dateFilter === "custom" && (
             <>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
-                  Start Date
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Ngày Bắt Đầu
                 </label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   value={customDateRange.start}
                   onChange={(e) =>
                     setCustomDateRange({
@@ -553,12 +531,12 @@ const Homestaff = () => {
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
-                  End Date
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Ngày Kết Thúc
                 </label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   value={customDateRange.end}
                   onChange={(e) =>
                     setCustomDateRange({
@@ -572,18 +550,18 @@ const Homestaff = () => {
           )}
 
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-400 mb-1">
-              Status
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Trạng Thái
             </label>
             <select
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">All Statuses</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
-              <option value="canceled">Canceled</option>
+              <option value="all">Tất Cả Trạng Thái</option>
+              <option value="confirmed">Đã Xác Nhận</option>
+              <option value="pending">Đang Chờ</option>
+              <option value="canceled">Đã Hủy</option>
             </select>
           </div>
 
@@ -592,8 +570,8 @@ const Homestaff = () => {
               <button
                 className={`flex-1 px-4 py-2 rounded-md focus:outline-none transition-colors ${
                   view === "table"
-                    ? "bg-orange-600 text-white"
-                    : "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                    ? "bg-cyan-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 onClick={() => setView("table")}
               >
@@ -612,14 +590,14 @@ const Homestaff = () => {
                       d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                     />
                   </svg>
-                  Table
+                  Bảng
                 </span>
               </button>
               <button
                 className={`flex-1 px-4 py-2 rounded-md focus:outline-none transition-colors ${
                   view === "calendar"
-                    ? "bg-orange-600 text-white"
-                    : "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                    ? "bg-cyan-500 text-white"
+                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 }`}
                 onClick={() => setView("calendar")}
               >
@@ -638,7 +616,7 @@ const Homestaff = () => {
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
                   </svg>
-                  Calendar
+                  Lịch
                 </span>
               </button>
             </div>
@@ -647,15 +625,19 @@ const Homestaff = () => {
       </div>
 
       {/* Loading State */}
-      {loading ? (
+      {loading || isFetching ? (
         <div className="flex justify-center items-center p-12">
-          <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       ) : (
         <>
           {/* Table View */}
           {view === "table" && (
-            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
+            <div
+              className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden"
+              data-aos="fade-up"
+              data-aos-delay="300"
+            >
               {filteredBookings.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-700">
@@ -663,39 +645,39 @@ const Homestaff = () => {
                       <tr>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
                         >
-                          Customer
+                          Khách Hàng
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
                         >
-                          Service
+                          Dịch Vụ
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
                         >
-                          Date & Time
+                          Ngày & Giờ
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
                         >
-                          Status
+                          Trạng Thái
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
                         >
-                          Notes
+                          Ghi Chú
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider"
                         >
-                          Actions
+                          Hành Động
                         </th>
                       </tr>
                     </thead>
@@ -704,6 +686,8 @@ const Homestaff = () => {
                         <tr
                           key={booking.id}
                           className="hover:bg-gray-750 transition-colors"
+                          data-aos="fade-right"
+                          data-aos-delay="100"
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -711,29 +695,32 @@ const Homestaff = () => {
                                 <div className="text-sm font-medium text-white">
                                   {booking.customerName}
                                 </div>
-                                <div className="text-sm text-gray-400">
+                                <div className="text-sm text-gray-300">
                                   {booking.customerPhone}
                                 </div>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-white">
-                              {booking.serviceName}
-                            </div>
-                            <div className="text-xs text-gray-400">
+                            <button
+                              className="text-sm text-cyan-400 hover:text-cyan-300 bg-gray-700 px-3 py-1 rounded-md"
+                              onClick={() => setShowDetails(booking)}
+                            >
+                              Xem chi tiết
+                            </button>
+                            <div className="text-xs text-gray-300 mt-1">
                               {moment(booking.endTime).diff(
                                 moment(booking.startTime),
                                 "minutes"
                               )}{" "}
-                              min
+                              phút
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-white">
-                              {moment(booking.startTime).format("MMM D, YYYY")}
+                              {moment(booking.startTime).format("D MMMM, YYYY")}
                             </div>
-                            <div className="text-xs text-gray-400">
+                            <div className="text-xs text-gray-300">
                               {moment(booking.startTime).format("h:mm A")} -{" "}
                               {moment(booking.endTime).format("h:mm A")}
                             </div>
@@ -744,13 +731,12 @@ const Homestaff = () => {
                                 booking.status
                               )} text-white`}
                             >
-                              {booking.status.charAt(0).toUpperCase() +
-                                booking.status.slice(1)}
+                              {getStatusDisplay(booking.status)}
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm text-gray-300 max-w-xs truncate">
-                              {booking.notes || "No notes"}
+                              {booking.notes}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -761,6 +747,7 @@ const Homestaff = () => {
                                     handleStatusChange(booking.id, "confirmed")
                                   }
                                   className="text-green-400 hover:text-green-600 transition-colors"
+                                  title="Xác nhận"
                                 >
                                   <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -782,6 +769,7 @@ const Homestaff = () => {
                                     handleStatusChange(booking.id, "canceled")
                                   }
                                   className="text-red-400 hover:text-red-600 transition-colors"
+                                  title="Hủy"
                                 >
                                   <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -807,7 +795,7 @@ const Homestaff = () => {
                                 }
                                 className="text-red-400 hover:text-red-600 transition-colors"
                               >
-                                Cancel
+                                Hủy
                               </button>
                             )}
                             {booking.status === "canceled" && (
@@ -815,9 +803,9 @@ const Homestaff = () => {
                                 onClick={() =>
                                   handleStatusChange(booking.id, "confirmed")
                                 }
-                                className="text-orange-400 hover:text-orange-600 transition-colors"
+                                className="text-cyan-400 hover:text-cyan-300 transition-colors"
                               >
-                                Restore
+                                Khôi phục
                               </button>
                             )}
                           </td>
@@ -827,10 +815,10 @@ const Homestaff = () => {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-8">
+                <div className="text-center py-8" data-aos="fade-up">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-12 w-12 text-gray-500 mx-auto mb-4"
+                    className="h-12 w-12 text-cyan-500 mx-auto mb-4"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -843,10 +831,14 @@ const Homestaff = () => {
                     />
                   </svg>
                   <h3 className="text-lg font-medium text-gray-300">
-                    No bookings found
+                    {bookings.length === 0
+                      ? "Không tìm thấy lịch làm việc"
+                      : "Không tìm thấy lịch hẹn"}
                   </h3>
-                  <p className="text-gray-500 mt-1">
-                    Try adjusting your filters to see more results.
+                  <p className="text-gray-400 mt-1">
+                    {bookings.length === 0
+                      ? "Bạn không có lịch hẹn nào được lên lịch."
+                      : "Hãy thử điều chỉnh bộ lọc để xem thêm kết quả."}
                   </p>
                 </div>
               )}
@@ -855,31 +847,159 @@ const Homestaff = () => {
 
           {/* Calendar View */}
           {view === "calendar" && (
-            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-4 h-screen max-h-[600px]">
-              <div className="h-full">
-                <Calendar
-                  localizer={localizer}
-                  events={calendarEvents}
-                  startAccessor="start"
-                  endAccessor="end"
-                  style={{ height: "100%" }}
-                  eventPropGetter={eventStyleGetter}
-                  views={["month", "week", "day"]}
-                  defaultView="week"
-                  formats={{
-                    timeGutterFormat: "h:mm A",
-                    eventTimeRangeFormat: ({ start, end }) => {
-                      return `${moment(start).format("h:mm A")} - ${moment(
-                        end
-                      ).format("h:mm A")}`;
-                    },
-                  }}
-                  className="salon-calendar"
-                />
-              </div>
+            <div
+              className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 p-4 h-screen max-h-[700px]"
+              data-aos="fade-up"
+              data-aos-delay="300"
+            >
+              {filteredBookings.length > 0 ? (
+                <div className="h-full">
+                  <Calendar
+                    localizer={localizer}
+                    events={calendarEvents}
+                    startAccessor="start"
+                    endAccessor="end"
+                    style={{ height: "100%" }}
+                    eventPropGetter={eventStyleGetter}
+                    views={["month", "week", "day"]}
+                    defaultView="week"
+                    formats={{
+                      timeGutterFormat: "h:mm A",
+                      eventTimeRangeFormat: ({ start, end }) => {
+                        return `${moment(start).format("h:mm A")} - ${moment(
+                          end
+                        ).format("h:mm A")}`;
+                      },
+                    }}
+                    className="salon-calendar"
+                    messages={{
+                      allDay: "Cả ngày",
+                      previous: "Trước",
+                      next: "Tiếp",
+                      today: "Hôm nay",
+                      month: "Tháng",
+                      week: "Tuần",
+                      day: "Ngày",
+                      agenda: "Lịch công tác",
+                      date: "Ngày",
+                      time: "Thời gian",
+                      event: "Sự kiện",
+                      noEventsInRange:
+                        "Không có lịch hẹn trong khoảng thời gian này.",
+                      showMore: (total) => `+${total} lịch hẹn nữa`,
+                    }}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="text-center py-8 h-full flex flex-col justify-center"
+                  data-aos="fade-up"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-12 w-12 text-cyan-500 mx-auto mb-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <h3 className="text-lg font-medium text-gray-300">
+                    {bookings.length === 0
+                      ? "Không tìm thấy lịch làm việc"
+                      : "Không tìm thấy lịch hẹn"}
+                  </h3>
+                  <p className="text-gray-400 mt-1">
+                    {bookings.length === 0
+                      ? "Bạn không có lịch hẹn nào được lên lịch."
+                      : "Hãy thử điều chỉnh bộ lọc để xem thêm kết quả."}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </>
+      )}
+
+      {/* Service Details Modal */}
+      {showDetails && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50"
+          data-aos="zoom-in"
+        >
+          <div className="bg-gradient-to-b from-gray-900 to-gray-800 rounded-2xl p-8 w-full max-w-[90%] max-h-[90vh] overflow-y-auto shadow-2xl border-2 border-cyan-400 relative">
+            <button
+              className="absolute top-4 right-4 text-cyan-400 hover:text-cyan-300 text-3xl font-bold transition-colors duration-200"
+              onClick={() => setShowDetails(null)}
+            >
+              ×
+            </button>
+            <h2 className="text-3xl font-extrabold text-center bg-gradient-to-r from-cyan-400 to-pink-500 text-transparent bg-clip-text mb-6">
+              Chi Tiết Dịch Vụ
+            </h2>
+            <div className="text-center mb-6">
+              <p className="text-lg text-gray-300">
+                <strong>Khách hàng:</strong> {showDetails.customerName}
+              </p>
+              <p className="text-lg text-gray-300">
+                <strong>Thời gian:</strong>{" "}
+                {moment(showDetails.startTime).format("D MMMM, YYYY, h:mm A")} -{" "}
+                {moment(showDetails.endTime).format("h:mm A")}
+              </p>
+            </div>
+            {showDetails.services.map((service, index) => {
+              const steps = parseSteps(service);
+              return (
+                <div key={index} className="mb-8">
+                  <h3 className="text-2xl font-bold text-cyan-300 mb-4">
+                    Dịch Vụ: {service.name.split("|")[0]}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {steps.map((step, stepIndex) => (
+                      <div
+                        key={stepIndex}
+                        className="flex flex-col bg-gray-700 rounded-lg p-4 shadow-md"
+                        data-aos="fade-up"
+                        data-aos-delay={`${100 * stepIndex}`}
+                      >
+                        <img
+                          src={
+                            step.image
+                              ? `http://localhost:8083/service-offering-images/${step.image}`
+                              : "/placeholder.jpg"
+                          }
+                          alt={step.name}
+                          className="w-full h-48 object-cover rounded-lg mb-4 border-2 border-cyan-300"
+                          loading="eager"
+                        />
+                        <h4 className="text-lg font-semibold text-white mb-2">
+                          {stepIndex === 0
+                            ? "Dịch Vụ Chính"
+                            : `Bước ${stepIndex + 1}`}
+                          : {step.name}
+                        </h4>
+                        <p className="text-gray-300 text-sm italic flex-grow">
+                          {step.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <button
+              className="mt-6 w-full bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105"
+              onClick={() => setShowDetails(null)}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Custom styles for react-big-calendar */}
@@ -887,20 +1007,22 @@ const Homestaff = () => {
         :global(.salon-calendar) {
           background-color: #1f2937;
           color: white;
-          border-radius: 0.5rem;
+          border-radius: 0.75rem;
+          padding: 1rem;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
         :global(.salon-calendar .rbc-header) {
-          background-color: #111827;
-          color: #9ca3af;
-          padding: 8px;
-          border-bottom: 1px solid #374151;
+          background-color: #374151;
+          color: #a5b4fc;
+          padding: 10px;
+          border-bottom: 1px solid #4b5563;
           text-transform: uppercase;
-          font-size: 0.75rem;
-          font-weight: 600;
+          font-size: 0.85rem;
+          font-weight: 700;
         }
         :global(.salon-calendar .rbc-time-header) {
-          background-color: #111827;
-          border-bottom: 1px solid #374151;
+          background-color: #374151;
+          border-bottom: 1px solid #4b5563;
         }
         :global(.salon-calendar .rbc-time-content) {
           background-color: #1f2937;
@@ -908,56 +1030,63 @@ const Homestaff = () => {
         }
         :global(.salon-calendar .rbc-timeslot-group) {
           background-color: #1f2937;
-          border-bottom: 1px solid #374151;
+          border-bottom: 1px solid #4b5563;
         }
         :global(.salon-calendar .rbc-time-slot) {
-          color: #9ca3af;
-          font-size: 0.75rem;
+          color: #a5b4fc;
+          font-size: 0.85rem;
         }
         :global(.salon-calendar .rbc-day-bg) {
           background-color: #1f2937;
-          border-left: 1px solid #374151;
+          border-left: 1px solid #4b5563;
         }
         :global(.salon-calendar .rbc-day-bg.rbc-today) {
           background-color: #374151;
         }
         :global(.salon-calendar .rbc-event) {
-          padding: 4px 8px;
-          font-size: 0.875rem;
-          border-radius: 4px;
+          padding: 6px 10px;
+          font-size: 0.9rem;
+          border-radius: 6px;
+          transition: transform 0.2s ease;
+        }
+        :global(.salon-calendar .rbc-event:hover) {
+          transform: scale(1.02);
         }
         :global(.salon-calendar .rbc-month-view) {
           background-color: #1f2937;
         }
         :global(.salon-calendar .rbc-month-row) {
-          border-top: 1px solid #374151;
+          border-top: 1px solid #4b5563;
         }
         :global(.salon-calendar .rbc-date-cell) {
-          color: #d1d5db;
-          padding: 8px;
+          color: #e5e7eb;
+          padding: 10px;
         }
         :global(.salon-calendar .rbc-off-range) {
           color: #6b7280;
         }
         :global(.salon-calendar .rbc-off-range-bg) {
-          background-color: #111827;
+          background-color: #374151;
         }
         :global(.salon-calendar .rbc-today) {
           background-color: #374151;
         }
         :global(.salon-calendar .rbc-btn-group button) {
-          background-color: #374151;
-          color: #d1d5db;
-          border: 1px solid #4b5563;
+          background-color: #4b5563;
+          color: #e5e7eb;
+          border: 1px solid #6b7280;
+          border-radius: 4px;
+          padding: 8px 12px;
+          font-size: 0.9rem;
         }
         :global(.salon-calendar .rbc-btn-group button:hover) {
-          background-color: #4b5563;
+          background-color: #6b7280;
           color: #ffffff;
         }
         :global(.salon-calendar .rbc-btn-group button.rbc-active) {
-          background-color: #f97316;
+          background-color: #3b82f6;
           color: #ffffff;
-          border-color: #f97316;
+          border-color: #3b82f6;
         }
       `}</style>
     </div>

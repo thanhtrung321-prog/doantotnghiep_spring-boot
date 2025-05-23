@@ -18,6 +18,7 @@ import AdminDashboard from "../pages/Dashboard/AdminDashboard";
 import StaffDashboard from "../pages/Dashboard/StaffDashboard";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
+import OwnerDasboard from "../pages/Dashboard/OwnerDasboard";
 // import Profile from "../pages/admin/Dashboard/homeadmin/Profile";
 
 // Component ProtectedRoute để bảo vệ các route dựa trên vai trò
@@ -134,6 +135,16 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute allowedRoles={["ADMIN"]}>
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Trang quản trị salon  - Bảo vệ cho Owner */}
+      <Route
+        path="/owner" // Dùng wildcard để bao gồm tất cả sub-route
+        element={
+          <ProtectedRoute allowedRoles={["OWNER"]}>
+            <OwnerDasboard />
           </ProtectedRoute>
         }
       />

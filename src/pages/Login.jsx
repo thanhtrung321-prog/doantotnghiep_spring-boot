@@ -98,6 +98,9 @@ const Login = () => {
           case "STAFF":
             window.location.href = "/staff";
             break;
+          case "OWNER":
+            window.location.href = "/owner";
+            break;
           case "USER":
           default:
             window.location.href = "/";
