@@ -120,7 +120,7 @@ const AppRoutes = () => {
       <Route
         path="/profile"
         element={
-          <ProtectedRoute allowedRoles={["USER", "STAFF", "ADMIN"]}>
+          <ProtectedRoute allowedRoles={["USER", "STAFF", "ADMIN", "OWNER"]}>
             <Header />
             <Navbar />
             <Profileuser />
@@ -141,7 +141,7 @@ const AppRoutes = () => {
 
       {/* Trang quản trị salon  - Bảo vệ cho Owner */}
       <Route
-        path="/owner" // Dùng wildcard để bao gồm tất cả sub-route
+        path="/owner/*" // Dùng wildcard để bao gồm tất cả sub-route
         element={
           <ProtectedRoute allowedRoles={["OWNER"]}>
             <OwnerDasboard />
