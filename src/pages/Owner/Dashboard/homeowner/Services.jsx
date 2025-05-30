@@ -375,7 +375,7 @@ const Services = () => {
         <div className="container mx-auto px-4">
           <h1
             ref={titleRef}
-            className="text-4xl font-bold text-center mb-2"
+            className="text-4xl font-bold text-center mb-2 uppercase tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-600"
             data-aos="zoom-in"
             data-aos-duration="1000"
           >
@@ -475,7 +475,7 @@ const Services = () => {
       <main className="container mx-auto px-4 relative z-10 -mt-8">
         <Suspense
           fallback={
-            <div className="flex justify-center items-center h-64">
+            <div className="flex justify-center items-center w-full h-screen">
               <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
           }
