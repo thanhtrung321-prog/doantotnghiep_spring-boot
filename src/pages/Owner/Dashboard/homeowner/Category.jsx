@@ -1,6 +1,11 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  lazy,
+  Suspense,
+  startTransition,
+} from "react";
 import {
   Search,
   PlusCircle,
@@ -12,7 +17,10 @@ import {
   LayoutGrid,
   List,
 } from "lucide-react";
+import AOS from "aos";
+import "aos/dist/aos.css";
 import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   getCategoriesBySalon,
   createCategory,
@@ -20,10 +28,34 @@ import {
   deleteCategory,
 } from "../api/categoryowner";
 
+// Register GSAP ScrollTrigger
+gsap.registerPlugin(ScrollTrigger);
+
 // Lazy load components
 const SalonLoadingScreen = lazy(() =>
   import("../../Dashboard/homeowner/Loadingowner")
 );
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="text-center text-red-500 p-8">
+          <p className="text-xl font-semibold">Đã xảy ra lỗi</p>
+          <p>{this.state.error?.message || "Vui lòng thử lại sau."}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -36,7 +68,7 @@ const Categories = () => {
   const [formData, setFormData] = useState({
     name: "",
     salonId: "",
-    image: "",
+    image: null,
   });
   const [imagePreview, setImagePreview] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,12 +78,6 @@ const Categories = () => {
   const itemsPerPage = 6;
 
   // Refs
-  const mountRef = useRef(null);
-  const sceneRef = useRef(null);
-  const rendererRef = useRef(null);
-  const cameraRef = useRef(null);
-  const controlsRef = useRef(null);
-  const spheresRef = useRef([]);
   const deleteModalRef = useRef(null);
   const createEditModalRef = useRef(null);
   const headerRef = useRef(null);
@@ -71,171 +97,24 @@ const Categories = () => {
   // Control loading screen for 1.5 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsLoading(false);
+      startTransition(() => {
+        gsap.to(".loading-container", {
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.out",
+          onComplete: () => setIsLoading(false),
+        });
+      });
     }, 1500); // Matches Loadingowner's 1.5s duration
     return () => clearTimeout(timer);
   }, []);
 
-  // Initialize Three.js scene
-  useEffect(() => {
-    if (!mountRef.current) return;
-
-    const width = mountRef.current.clientWidth;
-    const height = mountRef.current.clientHeight;
-
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.z = 5;
-    cameraRef.current = camera;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setClearColor(0xffffff, 0);
-    mountRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(0, 1, 1);
-    scene.add(directionalLight);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDampingthirteenthPersonView;
-    controls.dampingFactor = 0.05;
-    controls.enableZoom = false;
-    controlsRef.current = controls;
-
-    spheresRef.current = [];
-    for (let i = 0; i < 5; i++) {
-      const geometry = new THREE.SphereGeometry(0.2, 32, 32);
-      const material = new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color("#FF9800"),
-        metalness: 0.2,
-        roughness: 0.5,
-        reflectivity: 0.5,
-        clearcoat: 0.3,
-      });
-      const sphere = new THREE.Mesh(geometry, material);
-
-      sphere.position.x = (Math.random() - 0.5) * 8;
-      sphere.position.y = (Math.random() - 0.5) * 8;
-      sphere.position.z = (Math.random() - 0.5) * 8;
-
-      scene.add(sphere);
-      spheresRef.current.push({
-        mesh: sphere,
-        speed: {
-          x: (Math.random() - 0.5) * 0.008,
-          y: (Math.random() - 0.5) * 0.008,
-          z: (Math.random() - 0.5) * 0.008,
-        },
-      });
-    }
-
-    const animate = () => {
-      requestAnimationFrame(animate);
-
-      spheresRef.current.forEach((sphere) => {
-        sphere.mesh.position.x += sphere.speed.x;
-        sphere.mesh.position.y += sphere.speed.y;
-        sphere.mesh.position.z += sphere.speed.z;
-
-        if (Math.abs(sphere.mesh.position.x) > 4) sphere.speed.x *= -1;
-        if (Math.abs(sphere.mesh.position.y) > 4) sphere.speed.y *= -1;
-        if (Math.abs(sphere.mesh.position.z) > 4) sphere.speed.z *= -1;
-      });
-
-      controls.update();
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      if (!mountRef.current) return;
-      const width = mountRef.current.clientWidth;
-      const height = mountRef.current.clientHeight;
-
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (mountRef.current && renderer.domElement) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      scene.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
-          object.material.dispose();
-        }
-      });
-      renderer.dispose();
-    };
-  }, []);
-
-  // GSAP animations for header, cards, and pagination
+  // Initialize AOS
   useEffect(() => {
     if (!isLoading) {
-      // Header animation
-      if (headerRef.current) {
-        gsap.fromTo(
-          headerRef.current,
-          { opacity: 0, y: -50 },
-          { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
-        );
-      }
-
-      // Card animations with scroll trigger
-      cardsRef.current.forEach((card, index) => {
-        if (card) {
-          gsap.fromTo(
-            card,
-            { opacity: 0, y: 30 },
-            {
-              opacity: 1,
-              y: 0,
-              duration: 0.6,
-              delay: index * 0.1,
-              ease: "power2.out",
-              scrollTrigger: {
-                trigger: card,
-                start: "top 80%",
-                toggleActions: "play none none none",
-              },
-            }
-          );
-        }
-      });
-
-      // Pagination animation
-      if (paginationRef.current) {
-        gsap.fromTo(
-          paginationRef.current,
-          { opacity: 0, y: 20 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: "power2.out",
-            scrollTrigger: {
-              trigger: paginationRef.current,
-              start: "top 90%",
-              toggleActions: "play none none none",
-            },
-          }
-        );
-      }
+      AOS.init({ duration: 800, easing: "ease-out", once: true });
     }
-  }, [isLoading, paginatedCategories]);
+  }, [isLoading]);
 
   // Animate modals with GSAP
   useEffect(() => {
@@ -286,6 +165,66 @@ const Categories = () => {
     }
   }, [isDeleteModalOpen]);
 
+  // GSAP animations for header, cards, and pagination
+  useEffect(() => {
+    if (!isLoading) {
+      // Header animation
+      if (headerRef.current) {
+        gsap.fromTo(
+          headerRef.current,
+          { opacity: 0, y: -50 },
+          { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+        );
+      }
+
+      // Cards animation with scroll trigger
+      cardsRef.current.forEach((card, index) => {
+        if (card) {
+          gsap.fromTo(
+            card,
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              delay: index * 0.1,
+              ease: "power2.out",
+              scrollTrigger: {
+                trigger: card,
+                start: "top 80%",
+                toggleActions: "play none none none",
+              },
+            }
+          );
+        }
+      });
+
+      // Pagination animation
+      if (paginationRef.current) {
+        gsap.fromTo(
+          paginationRef.current,
+          { opacity: 0, y: 20 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: "power2.out",
+            scrollTrigger: {
+              trigger: paginationRef.current,
+              start: "top 90%",
+              toggleActions: "play none none none",
+            },
+          }
+        );
+      }
+    }
+  }, [isLoading, paginatedCategories]);
+
+  // Update card refs for GSAP animations
+  useEffect(() => {
+    cardsRef.current = cardsRef.current.slice(0, paginatedCategories.length);
+  }, [paginatedCategories]);
+
   // Fetch salonId from localStorage and set formData
   useEffect(() => {
     const fetchUserData = async () => {
@@ -302,13 +241,17 @@ const Categories = () => {
             "Người dùng không phải chủ salon hoặc thiếu salonId."
           );
         }
-        setSalonId(user.salonId);
-        setFormData((prev) => ({
-          ...prev,
-          salonId: user.salonId.toString(),
-        }));
+        startTransition(() => {
+          setSalonId(user.salonId);
+          setFormData((prev) => ({
+            ...prev,
+            salonId: user.salonId.toString(),
+          }));
+        });
       } catch (error) {
-        setError(error.message || "Không thể tải thông tin salon");
+        startTransition(() => {
+          setError(error.message || "Không thể tải thông tin salon");
+        });
       }
     };
     fetchUserData();
@@ -320,30 +263,34 @@ const Categories = () => {
       if (salonId) {
         try {
           const categoryData = await getCategoriesBySalon(salonId);
-          setCategories(categoryData);
-          setCurrentPage(1);
+          startTransition(() => {
+            setCategories(categoryData);
+            setCurrentPage(1);
+          });
         } catch (error) {
-          setError("Không thể tải danh mục");
+          startTransition(() => {
+            setError("Không thể tải danh mục");
+          });
         }
       }
     };
-    fetchCategories();
-  }, [salonId]);
-
-  // Update card refs for GSAP animations
-  useEffect(() => {
-    cardsRef.current = cardsRef.current.slice(0, paginatedCategories.length);
-  }, [paginatedCategories]);
+    if (!isLoading) {
+      fetchCategories();
+    }
+  }, [salonId, isLoading]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    startTransition(() => {
+      setError("");
+    });
     try {
-      const categoryData = {
-        name: formData.name,
-        image: formData.image || null,
-      };
+      const categoryData = new FormData();
+      categoryData.append("name", formData.name);
+      if (formData.image instanceof File) {
+        categoryData.append("image", formData.image);
+      }
 
       if (currentCategory) {
         await updateCategory(salonId, currentCategory.id, categoryData);
@@ -351,15 +298,25 @@ const Categories = () => {
         await createCategory(salonId, categoryData);
       }
 
-      setIsModalOpen(false);
-      setFormData({ name: "", salonId: salonId.toString(), image: "" });
-      setImagePreview(null);
-      setCurrentCategory(null);
+      startTransition(() => {
+        setIsModalOpen(false);
+        setFormData({
+          name: "",
+          salonId: salonId?.toString() || "",
+          image: null,
+        });
+        setImagePreview(null);
+        setCurrentCategory(null);
+      });
 
       const updatedCategories = await getCategoriesBySalon(salonId);
-      setCategories(updatedCategories);
+      startTransition(() => {
+        setCategories(updatedCategories);
+      });
     } catch (error) {
-      setError(error.response?.data?.message || "Không thể lưu danh mục");
+      startTransition(() => {
+        setError(error.response?.data?.message || "Không thể lưu danh mục");
+      });
     }
   };
 
@@ -367,92 +324,157 @@ const Categories = () => {
   const handleDelete = async () => {
     try {
       await deleteCategory(salonId, categoryToDelete.id);
-      setCategories(categories.filter((cat) => cat.id !== categoryToDelete.id));
-      setIsDeleteModalOpen(false);
-      setCategoryToDelete(null);
+      startTransition(() => {
+        setCategories(
+          categories.filter((cat) => cat.id !== categoryToDelete.id)
+        );
+        setIsDeleteModalOpen(false);
+        setCategoryToDelete(null);
+      });
     } catch (error) {
-      setError("Không thể xóa danh mục");
+      startTransition(() => {
+        setError("Không thể xóa danh mục");
+      });
     }
   };
 
   // Open delete modal
   const openDeleteModal = (category) => {
-    setCategoryToDelete(category);
-    setIsDeleteModalOpen(true);
+    startTransition(() => {
+      setCategoryToDelete(category);
+      setIsDeleteModalOpen(true);
+    });
   };
 
   // Handle edit
   const handleEdit = (category) => {
-    setCurrentCategory(category);
-    setFormData({
-      name: category.name,
-      salonId: salonId.toString(),
-      image: category.image || "",
+    startTransition(() => {
+      setCurrentCategory(category);
+      setFormData({
+        name: category.name,
+        salonId: salonId?.toString() || "",
+        image: category.image || null,
+      });
+      setImagePreview(
+        category.image
+          ? `http://localhost:8086/category-images/${category.image}`
+          : null
+      );
+      setIsModalOpen(true);
     });
-    setImagePreview(
-      category.image
-        ? `http://localhost:8086/category-images/${category.image}`
-        : null
-    );
-    setIsModalOpen(true);
   };
 
   // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setFormData({ ...formData, image: file.name });
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result);
-      reader.readAsDataURL(file);
-    } else {
-      setFormData({ ...formData, image: "" });
-      setImagePreview(null);
-    }
+    startTransition(() => {
+      if (file) {
+        setFormData({ ...formData, image: file });
+        const reader = new FileReader();
+        reader.onload = () => setImagePreview(reader.result);
+        reader.readAsDataURL(file);
+      } else {
+        setFormData({ ...formData, image: null });
+        setImagePreview(null);
+      }
+    });
   };
 
   // Handle image removal
   const handleRemoveImage = () => {
-    setFormData({ ...formData, image: "" });
-    setImagePreview(null);
+    startTransition(() => {
+      setFormData({ ...formData, image: null });
+      setImagePreview(null);
+    });
   };
 
-  return (
-    <Suspense fallback={<SalonLoadingScreen />}>
-      {isLoading ? (
-        <SalonLoadingScreen />
-      ) : (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100">
-          <div
-            ref={mountRef}
-            className="fixed inset-0 -z-10"
-            aria-hidden="true"
-          />
+  // Handle search input
+  const handleSearchChange = (e) => {
+    startTransition(() => {
+      setSearchTerm(e.target.value);
+      setCurrentPage(1);
+    });
+  };
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  // Handle view mode toggle
+  const handleViewModeToggle = (mode) => {
+    startTransition(() => {
+      setViewMode(mode);
+    });
+  };
+
+  // Handle pagination
+  const handlePageChange = (page) => {
+    startTransition(() => {
+      setCurrentPage(page);
+    });
+  };
+
+  // Handle modal close
+  const handleCloseModal = () => {
+    startTransition(() => {
+      setIsModalOpen(false);
+      setError("");
+      setImagePreview(null);
+      setCurrentCategory(null);
+      setFormData({
+        name: "",
+        salonId: salonId?.toString() || "",
+        image: null,
+      });
+    });
+  };
+
+  // Handle delete modal close
+  const handleCloseDeleteModal = () => {
+    startTransition(() => {
+      setIsDeleteModalOpen(false);
+      setCategoryToDelete(null);
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <Suspense fallback={<div>Loading...</div>}>
+        <div className="loading-container fixed inset-0 z-50">
+          <SalonLoadingScreen />
+        </div>
+      </Suspense>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<div>Loading...</div>}>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 relative z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
             <style>
               {`
-              .card {
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-              }
-              .card:hover {
-                transform: translateY(-4px);
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-              }
-              .modal {
-                border-radius: 12px;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-              }
-              .button {
-                transition: background-color 0.2s ease, transform 0.2s ease;
-              }
-              .button:hover {
-                transform: scale(1.05);
-              }
-            `}
+                .card {
+                  transition: transform 0.3s ease, box-shadow 0.3s ease;
+                }
+                .card:hover {
+                  transform: translateY(-4px);
+                  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+                }
+                .modal {
+                  border-radius: 12px;
+                  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                }
+                .button {
+                  transition: background-color 0.2s ease, transform 0.2s ease;
+                }
+                .button:hover {
+                  transform: scale(1.05);
+                }
+              `}
             </style>
 
-            <header ref={headerRef} className="mb-12 text-center">
+            <header
+              ref={headerRef}
+              className="mb-12 text-center"
+              data-aos="fade-down"
+            >
               <h1 className="text-4xl font-bold text-orange-800 mb-3">
                 Quản lý danh mục dịch vụ
               </h1>
@@ -462,13 +484,16 @@ const Categories = () => {
             </header>
 
             {error && (
-              <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+              <div
+                className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg"
+                data-aos="fade-up"
+              >
                 {error}
               </div>
             )}
 
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-              <div className="w-full md:w-96 relative">
+              <div className="w-full md:w-96 relative" data-aos="fade-right">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Search className="h-5 w-5 text-orange-400" />
                 </div>
@@ -478,14 +503,14 @@ const Categories = () => {
                   className="pl-10 pr-4 py-2 w-full border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
                   aria-label="Tìm kiếm danh mục"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
                 />
               </div>
 
-              <div className="flex gap-4 items-center">
+              <div className="flex gap-4 items-center" data-aos="fade-left">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setViewMode("grid")}
+                    onClick={() => handleViewModeToggle("grid")}
                     className={`p-2 rounded-lg ${
                       viewMode === "grid"
                         ? "bg-orange-500 text-white"
@@ -496,7 +521,7 @@ const Categories = () => {
                     <LayoutGrid className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={() => setViewMode("list")}
+                    onClick={() => handleViewModeToggle("list")}
                     className={`p-2 rounded-lg ${
                       viewMode === "list"
                         ? "bg-orange-500 text-white"
@@ -510,14 +535,16 @@ const Categories = () => {
 
                 <button
                   onClick={() => {
-                    setCurrentCategory(null);
-                    setFormData({
-                      name: "",
-                      salonId: salonId?.toString() || "",
-                      image: "",
+                    startTransition(() => {
+                      setCurrentCategory(null);
+                      setFormData({
+                        name: "",
+                        salonId: salonId?.toString() || "",
+                        image: null,
+                      });
+                      setImagePreview(null);
+                      setIsModalOpen(true);
                     });
-                    setImagePreview(null);
-                    setIsModalOpen(true);
                   }}
                   disabled={!salonId}
                   className="flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 button disabled:opacity-50"
@@ -542,6 +569,8 @@ const Categories = () => {
                   className={`card bg-white rounded-xl shadow-md overflow-hidden border border-orange-100 ${
                     viewMode === "list" ? "flex" : ""
                   }`}
+                  data-aos="fade-up"
+                  data-aos-delay={index * 100}
                 >
                   <div
                     className={`relative ${
@@ -616,20 +645,25 @@ const Categories = () => {
             </div>
 
             {paginatedCategories.length === 0 && (
-              <div className="text-center text-orange-700 mt-8">
+              <div
+                className="text-center text-orange-700 mt-8"
+                data-aos="fade-up"
+              >
                 Không tìm thấy danh mục nào.
               </div>
             )}
 
-            <div ref={paginationRef} className="mt-12 flex justify-center">
+            <div
+              ref={paginationRef}
+              className="mt-12 flex justify-center"
+              data-aos="fade-up"
+            >
               <nav
                 className="flex items-center space-x-2"
                 aria-label="Phân trang"
               >
                 <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
+                  onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
                   disabled={currentPage === 1}
                   className="p-2 rounded-full bg-orange-100 text-orange-700 hover:bg-orange-200 button disabled:opacity-50"
                   aria-label="Trang trước"
@@ -642,7 +676,7 @@ const Categories = () => {
                     (page) => (
                       <button
                         key={page}
-                        onClick={() => setCurrentPage(page)}
+                        onClick={() => handlePageChange(page)}
                         className={`px-4 py-2 rounded-md ${
                           page === currentPage
                             ? "bg-orange-500 text-white"
@@ -657,7 +691,7 @@ const Categories = () => {
 
                 <button
                   onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    handlePageChange(Math.min(currentPage + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
                   className="p-2 rounded-full bg-orange-100 text-orange-700 hover:bg-orange-200 button disabled:opacity-50"
@@ -683,11 +717,7 @@ const Categories = () => {
                       : "Thêm danh mục mới"}
                   </h2>
                   <button
-                    onClick={() => {
-                      setIsModalOpen(false);
-                      setError("");
-                      setImagePreview(null);
-                    }}
+                    onClick={handleCloseModal}
                     className="text-orange-600 hover:text-orange-800 button"
                   >
                     <X className="h-6 w-6" />
@@ -720,7 +750,7 @@ const Categories = () => {
                       onChange={handleImageChange}
                       className="w-full px-4 py-2 border border-orange-200 rounded-lg text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 transition shadow-sm"
                     />
-                    {formData.image && (
+                    {imagePreview && (
                       <div className="mt-3 flex items-center gap-3">
                         <div className="relative">
                           <img
@@ -738,7 +768,7 @@ const Categories = () => {
                           </button>
                         </div>
                         <p className="text-sm text-orange-600">
-                          Đã chọn: {formData.image}
+                          Đã chọn: {formData.image?.name || formData.image}
                         </p>
                       </div>
                     )}
@@ -753,11 +783,7 @@ const Categories = () => {
                   <div className="flex justify-end gap-3">
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsModalOpen(false);
-                        setError("");
-                        setImagePreview(null);
-                      }}
+                      onClick={handleCloseModal}
                       className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 button"
                     >
                       Hủy
@@ -790,7 +816,7 @@ const Categories = () => {
                     ))}
                   </h2>
                   <button
-                    onClick={() => setIsDeleteModalOpen(false)}
+                    onClick={handleCloseDeleteModal}
                     className="text-orange-600 hover:text-orange-800 button"
                   >
                     <X className="h-6 w-6" />
@@ -803,7 +829,7 @@ const Categories = () => {
                 </p>
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={() => setIsDeleteModalOpen(false)}
+                    onClick={handleCloseDeleteModal}
                     className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 button"
                   >
                     Hủy
@@ -819,8 +845,8 @@ const Categories = () => {
             </div>
           )}
         </div>
-      )}
-    </Suspense>
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 

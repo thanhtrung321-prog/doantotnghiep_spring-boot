@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  lazy,
+  Suspense,
+  startTransition,
+} from "react";
 import {
   Search,
   Download,
@@ -104,8 +111,10 @@ const Payment = () => {
   // Control loading screen for 1.5 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500); // Matches Loadingowner's 1.5s duration
+      startTransition(() => {
+        setIsLoading(false);
+      });
+    }, 1500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -116,10 +125,12 @@ const Payment = () => {
     const loadPayments = async () => {
       try {
         const { payments, stats } = await fetchPayments();
-        setPayments(payments);
-        setFilteredPayments(payments);
-        setOriginalPayments(payments);
-        setStats({ ...stats, bookingCount: payments.length });
+        startTransition(() => {
+          setPayments(payments);
+          setFilteredPayments(payments);
+          setOriginalPayments(payments);
+          setStats({ ...stats, bookingCount: payments.length });
+        });
       } catch (error) {
         toast.error("Không thể tải dữ liệu thanh toán");
       }
@@ -225,8 +236,10 @@ const Payment = () => {
       );
     });
 
-    setFilteredPayments(filtered);
-    setCurrentPage(1);
+    startTransition(() => {
+      setFilteredPayments(filtered);
+      setCurrentPage(1);
+    });
 
     if (searchQuery && filtered.length > 0 && searchInputRef.current) {
       searchInputRef.current.focus();
@@ -343,16 +356,20 @@ const Payment = () => {
   }, [isDetailModalOpen, isUserModalOpen, isChartModalOpen]);
 
   const handleViewDetails = async (payment) => {
-    setSelectedPayment(payment);
-    setNewPaymentStatus(payment.status.toLowerCase());
+    startTransition(() => {
+      setSelectedPayment(payment);
+      setNewPaymentStatus(payment.status.toLowerCase());
+      setIsDetailModalOpen(true);
+    });
     try {
       const [salon, user] = await Promise.all([
         fetchSalonDetails(payment.salon_id),
         fetchUserDetails(payment.user_id),
       ]);
-      setSalonDetails(salon);
-      setUserDetails(user);
-      setIsDetailModalOpen(true);
+      startTransition(() => {
+        setSalonDetails(salon);
+        setUserDetails(user);
+      });
     } catch (error) {
       toast.error("Không thể tải chi tiết salon hoặc người dùng");
     }
@@ -362,8 +379,10 @@ const Payment = () => {
     if (selectedPayment) {
       try {
         const user = await fetchUserDetails(selectedPayment.user_id);
-        setUserDetails(user);
-        setIsUserModalOpen(true);
+        startTransition(() => {
+          setUserDetails(user);
+          setIsUserModalOpen(true);
+        });
       } catch (error) {
         toast.error("Lỗi khi tải chi tiết người dùng");
       }
@@ -377,47 +396,49 @@ const Payment = () => {
         selectedPayment.id,
         newPaymentStatus.toUpperCase()
       );
-      setPayments((prev) =>
-        prev.map((payment) =>
-          payment.id === selectedPayment.id
-            ? { ...payment, status: updatedPayment.status.toLowerCase() }
-            : payment
-        )
-      );
-      setFilteredPayments((prev) =>
-        prev.map((payment) =>
-          payment.id === selectedPayment.id
-            ? { ...payment, status: updatedPayment.status.toLowerCase() }
-            : payment
-        )
-      );
-      setOriginalPayments((prev) =>
-        prev.map((payment) =>
-          payment.id === selectedPayment.id
-            ? { ...payment, status: updatedPayment.status.toLowerCase() }
-            : payment
-        )
-      );
-      setStats((prev) => {
-        const newSuccessCount =
-          newPaymentStatus.toLowerCase() === "success" &&
-          selectedPayment.status !== "success"
-            ? prev.successRate * prev.totalTransactions + 1
-            : prev.successRate * prev.totalTransactions;
-        return {
-          ...prev,
-          totalRevenue:
+      startTransition(() => {
+        setPayments((prev) =>
+          prev.map((payment) =>
+            payment.id === selectedPayment.id
+              ? { ...payment, status: updatedPayment.status.toLowerCase() }
+              : payment
+          )
+        );
+        setFilteredPayments((prev) =>
+          prev.map((payment) =>
+            payment.id === selectedPayment.id
+              ? { ...payment, status: updatedPayment.status.toLowerCase() }
+              : payment
+          )
+        );
+        setOriginalPayments((prev) =>
+          prev.map((payment) =>
+            payment.id === selectedPayment.id
+              ? { ...payment, status: updatedPayment.status.toLowerCase() }
+              : payment
+          )
+        );
+        setStats((prev) => {
+          const newSuccessCount =
             newPaymentStatus.toLowerCase() === "success" &&
             selectedPayment.status !== "success"
-              ? prev.totalRevenue + selectedPayment.amount
-              : prev.totalRevenue,
-          successRate:
-            prev.totalTransactions > 0
-              ? (newSuccessCount / prev.totalTransactions) * 100
-              : 0,
-        };
+              ? prev.successRate * prev.totalTransactions + 1
+              : prev.successRate * prev.totalTransactions;
+          return {
+            ...prev,
+            totalRevenue:
+              newPaymentStatus.toLowerCase() === "success" &&
+              selectedPayment.status !== "success"
+                ? prev.totalRevenue + selectedPayment.amount
+                : prev.totalRevenue,
+            successRate:
+              prev.totalTransactions > 0
+                ? (newSuccessCount / prev.totalTransactions) * 100
+                : 0,
+          };
+        });
+        setIsDetailModalOpen(false);
       });
-      setIsDetailModalOpen(false);
       toast.success("Cập nhật trạng thái thanh toán thành công");
     } catch (error) {
       toast.error(`Không thể cập nhật trạng thái thanh toán: ${error.message}`);
@@ -477,18 +498,50 @@ const Payment = () => {
   };
 
   const handleSearch = () => {
-    setSearchQuery(searchTerm);
+    startTransition(() => {
+      setSearchQuery(searchTerm);
+    });
   };
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
-      handleSearch();
+      startTransition(() => {
+        setSearchQuery(searchTerm);
+      });
     }
+  };
+
+  const handleSortChange = (e) => {
+    startTransition(() => {
+      setSortOption(e.target.value);
+    });
+  };
+
+  const handleChartModalToggle = () => {
+    startTransition(() => {
+      setIsChartModalOpen((prev) => !prev);
+    });
+  };
+
+  const handleCloseDetailModal = () => {
+    startTransition(() => {
+      setIsDetailModalOpen(false);
+      setSalonDetails(null);
+      setUserDetails(null);
+    });
+  };
+
+  const handleCloseUserModal = () => {
+    startTransition(() => {
+      setIsUserModalOpen(false);
+    });
   };
 
   const paginate = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber);
+      startTransition(() => {
+        setCurrentPage(pageNumber);
+      });
     }
   };
 
@@ -502,9 +555,9 @@ const Payment = () => {
             <style>
               {`
                 @keyframes rgbText {
-                  0% { color: #7C3AED; } /* Purple */
-                  33% { color: #EC4899; } /* Pink */
-                  66% { color: #3B82F6; } /* Blue */
+                  0% { color: #7C3AED; }
+                  33% { color: #EC4899; }
+                  66% { color: #3B82F6; }
                   100% { color: #7C3AED; }
                 }
                 .rgb-placeholder::placeholder {
@@ -613,7 +666,7 @@ const Payment = () => {
                 <div className="flex flex-wrap gap-2">
                   <select
                     value={sortOption}
-                    onChange={(e) => setSortOption(e.target.value)}
+                    onChange={handleSortChange}
                     className="px-4 py-2 bg-gray-800/70 text-white rounded-lg border border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-lg button"
                   >
                     <option value="default">Mặc định</option>
@@ -623,7 +676,7 @@ const Payment = () => {
                     <option value="idDesc">ID: Cao đến Thấp</option>
                   </select>
                   <button
-                    onClick={() => setIsChartModalOpen(true)}
+                    onClick={handleChartModalToggle}
                     className="flex items-center px-4 py-2 bg-gray-800/70 text-white rounded-lg hover:bg-gray-700/70 transition-colors backdrop-blur-lg border border-gray-700/50 button"
                   >
                     <PieChart className="h-5 w-5 mr-2" />
@@ -837,11 +890,7 @@ const Payment = () => {
             {isDetailModalOpen && selectedPayment && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-black/60 backdrop-blur-sm"
-                onClick={() => {
-                  setIsDetailModalOpen(false);
-                  setSalonDetails(null);
-                  setUserDetails(null);
-                }}
+                onClick={handleCloseDetailModal}
               >
                 <div
                   ref={modalRef}
@@ -926,7 +975,11 @@ const Payment = () => {
                         <p className="text-gray-400 text-sm">Trạng thái</p>
                         <select
                           value={newPaymentStatus}
-                          onChange={(e) => setNewPaymentStatus(e.target.value)}
+                          onChange={(e) =>
+                            startTransition(() =>
+                              setNewPaymentStatus(e.target.value)
+                            )
+                          }
                           className="mt-2 w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                           <option value="pending">Chờ xử lý</option>
@@ -979,11 +1032,7 @@ const Payment = () => {
                           Cập nhật trạng thái
                         </button>
                         <button
-                          onClick={() => {
-                            setIsDetailModalOpen(false);
-                            setSalonDetails(null);
-                            setUserDetails(null);
-                          }}
+                          onClick={handleCloseDetailModal}
                           className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors shadow-md button"
                         >
                           Đóng
@@ -998,7 +1047,7 @@ const Payment = () => {
             {isUserModalOpen && userDetails && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-black/60 backdrop-blur-sm"
-                onClick={() => setIsUserModalOpen(false)}
+                onClick={handleCloseUserModal}
               >
                 <div
                   ref={modalRef}
@@ -1028,7 +1077,7 @@ const Payment = () => {
                   </div>
                   <div className="flex justify-end mt-6">
                     <button
-                      onClick={() => setIsUserModalOpen(false)}
+                      onClick={handleCloseUserModal}
                       className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-colors shadow-md button"
                     >
                       Đóng
@@ -1041,7 +1090,7 @@ const Payment = () => {
             {isChartModalOpen && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-black/60 backdrop-blur-sm"
-                onClick={() => setIsChartModalOpen(false)}
+                onClick={handleChartModalToggle}
               >
                 <div
                   ref={modalRef}
@@ -1054,7 +1103,7 @@ const Payment = () => {
                   <canvas ref={chartRef}></canvas>
                   <div className="flex justify-end mt-6">
                     <button
-                      onClick={() => setIsChartModalOpen(false)}
+                      onClick={handleChartModalToggle}
                       className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors shadow-md button"
                     >
                       Đóng
