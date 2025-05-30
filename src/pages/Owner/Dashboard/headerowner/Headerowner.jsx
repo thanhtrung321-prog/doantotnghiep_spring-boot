@@ -108,7 +108,6 @@ const Headerowner = () => {
     { to: "/owner/ownerbookings", label: "Bookings", icon: Calendar },
     { to: "/owner/ownercategory", label: "Category", icon: Grid3x3 },
     { to: "/owner/ownerpayment", label: "Payment", icon: CreditCard },
-    { to: "/owner/ownersalon", label: "Salon", icon: Store },
     { to: "/owner/ownerservices", label: "Services", icon: Scissors },
     { to: "/owner/ownerusers", label: "Users", icon: Users },
   ];
@@ -120,20 +119,25 @@ const Headerowner = () => {
         className="bg-gray-900 border-b border-gray-700 shadow-xl relative z-50"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-20">
+            {" "}
+            {/* Increased height to h-20 */}
             {/* Logo */}
             <div ref={logoRef} className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
                 <Scissors className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <div className="max-w-[200px] overflow-hidden">
+                {" "}
+                {/* Limit width for long names */}
+                <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent truncate leading-tight">
                   {salonData ? salonData.name : "Salon Owner"}
                 </h1>
-                <p className="text-xs text-gray-400">Management System</p>
+                <p className="text-xs text-gray-400 truncate">
+                  Management System
+                </p>
               </div>
             </div>
-
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center space-x-1">
               {navigationItems.map((item) => {
@@ -156,7 +160,6 @@ const Headerowner = () => {
                 );
               })}
             </nav>
-
             {/* Right Side */}
             <div className="flex items-center space-x-4">
               {/* Notifications */}
@@ -174,7 +177,7 @@ const Headerowner = () => {
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <span className="hidden md:block text-sm font-medium">
+                  <span className="hidden md:block text-sm font-medium truncate max-w-[100px]">
                     {userData ? userData.fullName : "Admin"}
                   </span>
                 </button>
@@ -185,16 +188,16 @@ const Headerowner = () => {
                     <div className="py-2">
                       {userData && (
                         <div className="px-4 py-2 border-b border-gray-700">
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-gray-300 truncate">
                             ID: {userData.id}
                           </p>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-gray-300 truncate">
                             Tên: {userData.fullName}
                           </p>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-gray-300 truncate">
                             Email: {userData.email}
                           </p>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-gray-300 truncate">
                             Vai trò: {userData.role}
                           </p>
                         </div>
