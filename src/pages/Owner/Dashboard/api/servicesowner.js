@@ -1,46 +1,86 @@
 import axios from "axios";
 
-// API base URLs
+const USER_API = "http://localhost:8082/user";
 const SALON_API = "http://localhost:8084/salon";
 const CATEGORY_API = "http://localhost:8086/categories/salon";
 const SERVICE_API = "http://localhost:8083/service-offering";
 const SERVICE_OWNER_API = "http://localhost:8083/service-offering/salon-owner";
 const IMAGE_BASE_URL = "http://localhost:8083/service-offering-images";
 
-// Fetch all salons
-export const fetchSalons = async () => {
+export const fetchUserData = async (userId) => {
+  if (!userId || typeof userId !== "string") {
+    console.error("Invalid userId provided:", userId);
+    throw new Error("ID người dùng không hợp lệ");
+  }
+
   try {
-    const response = await axios.get(SALON_API);
-    return response.data;
+    const response = await axios.get(`${USER_API}/${userId}`);
+    const user = response.data;
+    if (user.role !== "OWNER" || !user.salonId) {
+      throw new Error(
+        "Người dùng không phải là chủ salon hoặc không có salonId"
+      );
+    }
+    return user;
   } catch (error) {
-    console.error("Error fetching salons:", error);
-    throw new Error("Không thể tải danh sách salon");
+    console.error("Error fetching user data:", error);
+    throw new Error(
+      error.response?.data?.message || "Không thể tải thông tin người dùng"
+    );
   }
 };
 
-// Fetch categories for a specific salon
+export const fetchSalonData = async (salonId) => {
+  if (!salonId || isNaN(salonId)) {
+    console.error("Invalid salonId provided:", salonId);
+    throw new Error("ID salon không hợp lệ");
+  }
+
+  try {
+    const response = await axios.get(`${SALON_API}/${salonId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching salon data for salon ${salonId}:`, error);
+    throw new Error(
+      error.response?.data?.message || "Không thể tải thông tin salon"
+    );
+  }
+};
+
 export const fetchCategoriesBySalon = async (salonId) => {
+  if (!salonId || isNaN(salonId)) {
+    console.error("Invalid salonId provided:", salonId);
+    throw new Error("ID salon không hợp lệ");
+  }
+
   try {
     const response = await axios.get(`${CATEGORY_API}/${salonId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching categories for salon ${salonId}:`, error);
-    throw new Error("Không thể tải danh sách danh mục");
+    throw new Error(
+      error.response?.data?.message || "Không thể tải danh sách danh mục"
+    );
   }
 };
 
-// Fetch services for a specific salon
 export const fetchServicesBySalon = async (salonId) => {
+  if (!salonId || isNaN(salonId)) {
+    console.error("Invalid salonId provided:", salonId);
+    throw new Error("ID salon không hợp lệ");
+  }
+
   try {
     const response = await axios.get(`${SERVICE_API}/salon/${salonId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching services for salon ${salonId}:`, error);
-    throw new Error("Không thể tải danh sách dịch vụ");
+    throw new Error(
+      error.response?.data?.message || "Không thể tải danh sách dịch vụ"
+    );
   }
 };
 
-// Create a new service
 export const createService = async (serviceData) => {
   try {
     const response = await axios.post(SERVICE_OWNER_API, serviceData, {
@@ -49,11 +89,10 @@ export const createService = async (serviceData) => {
     return response.data;
   } catch (error) {
     console.error("Error creating service:", error);
-    throw new Error("Không thể tạo dịch vụ");
+    throw new Error(error.response?.data?.message || "Không thể tạo dịch vụ");
   }
 };
 
-// Update an existing service
 export const updateService = async (serviceId, serviceData) => {
   try {
     const response = await axios.put(
@@ -66,24 +105,22 @@ export const updateService = async (serviceId, serviceData) => {
     return response.data;
   } catch (error) {
     console.error(`Error updating service ${serviceId}:`, error);
-    throw new Error("Không thể cập nhật dịch vụ");
+    throw new Error(
+      error.response?.data?.message || "Không thể cập nhật dịch vụ"
+    );
   }
 };
 
-// Delete a service
 export const deleteService = async (serviceId) => {
   try {
     await axios.delete(`${SERVICE_OWNER_API}/${serviceId}`);
     return true;
   } catch (error) {
     console.error(`Error deleting service ${serviceId}:`, error);
-    throw new Error("Không thể xóa dịch vụ");
+    throw new Error(error.response?.data?.message || "Không thể xóa dịch vụ");
   }
 };
 
-// Get image URL
 export const getImageUrl = (filename) => {
-  return filename
-    ? `${IMAGE_BASE_URL}/${filename}`
-    : "/api/placeholder/300/200";
+  return filename ? `${IMAGE_BASE_URL}/${filename}` : "/images/placeholder.png";
 };
