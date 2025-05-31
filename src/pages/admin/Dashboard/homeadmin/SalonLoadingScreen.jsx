@@ -1,185 +1,380 @@
 import React, { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
-import AOS from "aos";
-import "aos/dist/aos.css";
 
-const SalonLoadingScreen = ({ serviceImages, salonName }) => {
-  const logoRef = useRef(null);
-  const textRef = useRef(null);
-  const scissorsRef = useRef(null);
+const PremiumSalonLoadingScreen = ({ salonName = "Beauty Salon" }) => {
   const containerRef = useRef(null);
-  const progressBarRef = useRef(null);
+  const titleRef = useRef(null);
+  const subtitleRef = useRef(null);
+  const runnerRef = useRef(null);
+  const progressTrackRef = useRef(null);
+  const progressFillRef = useRef(null);
   const percentRef = useRef(null);
-  const imageRef = useRef(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const particlesRef = useRef(null);
+  const glowRef = useRef(null);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    AOS.init({ duration: 1000, easing: "ease-out", once: true });
-
     const tl = gsap.timeline();
 
-    tl.from(logoRef.current, {
-      scale: 0,
-      rotate: 360,
-      duration: 1.5,
-      ease: "elastic.out(1, 0.5)",
-    });
-
-    const letters = textRef.current.querySelectorAll(".letter");
-    tl.from(
-      letters,
+    // Initial setup
+    gsap.set(
+      [
+        titleRef.current,
+        subtitleRef.current,
+        runnerRef.current,
+        progressTrackRef.current,
+      ],
       {
-        y: 30,
         opacity: 0,
-        stagger: 0.1,
-        duration: 0.6,
-        ease: "power4.out",
-      },
-      "-=1"
+        y: 50,
+      }
     );
 
-    gsap.to(scissorsRef.current, {
-      rotate: 15,
-      duration: 0.5,
-      repeat: -1,
-      yoyo: true,
-      ease: "power2.inOut",
-    });
-
+    // Container fade in
     tl.fromTo(
-      progressBarRef.current,
-      { width: "0%" },
+      containerRef.current,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.8, ease: "power2.out" }
+    );
+
+    // Title animation with stagger effect
+    const titleLetters = titleRef.current.querySelectorAll(".letter");
+    tl.fromTo(
+      titleLetters,
+      { y: 100, opacity: 0, rotationX: 90 },
       {
-        width: "100%",
-        duration: 1.5,
-        ease: "power3.inOut",
+        y: 0,
+        opacity: 1,
+        rotationX: 0,
+        duration: 0.8,
+        stagger: 0.1,
+        ease: "back.out(1.7)",
+      },
+      "-=0.3"
+    );
+
+    // Subtitle fade in
+    tl.fromTo(
+      subtitleRef.current,
+      { opacity: 0, y: 30 },
+      { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" },
+      "-=0.4"
+    );
+
+    // Progress track appear
+    tl.fromTo(
+      progressTrackRef.current,
+      { opacity: 0, scaleX: 0 },
+      { opacity: 1, scaleX: 1, duration: 0.8, ease: "power3.out" },
+      "-=0.2"
+    );
+
+    // Runner appear
+    tl.fromTo(
+      runnerRef.current,
+      { opacity: 0, x: -50, scale: 0.5 },
+      { opacity: 1, x: 0, scale: 1, duration: 0.6, ease: "back.out(1.7)" },
+      "-=0.4"
+    );
+
+    // Progress animation
+    const progressTl = gsap.timeline({ delay: 1 });
+    progressTl.to(
+      {},
+      {
+        duration: 4,
+        ease: "power2.inOut",
         onUpdate: function () {
-          const progress = Math.round(this.progress() * 100);
+          const currentProgress = Math.round(this.progress() * 100);
+          setProgress(currentProgress);
+
+          // Update progress bar
+          gsap.set(progressFillRef.current, {
+            width: `${currentProgress}%`,
+          });
+
+          // Move runner
+          gsap.set(runnerRef.current, {
+            x: `${currentProgress * 4}px`,
+          });
+
+          // Update percentage
           if (percentRef.current) {
-            percentRef.current.textContent = `${progress}%`;
+            percentRef.current.textContent = `${currentProgress}%`;
           }
         },
       }
     );
 
-    if (serviceImages.length > 0) {
-      const imageInterval = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % serviceImages.length);
-      }, 2000);
-      gsap.fromTo(
-        imageRef.current,
-        { opacity: 0, scale: 0.9, y: 10 },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 1,
-          ease: "power3.out",
-          repeat: -1,
-          repeatDelay: 1,
-        }
-      );
-      return () => clearInterval(imageInterval);
-    }
+    // Floating animation for runner
+    gsap.to(runnerRef.current, {
+      y: -5,
+      duration: 0.6,
+      repeat: -1,
+      yoyo: true,
+      ease: "power2.inOut",
+    });
 
-    return () => {};
-  }, [serviceImages]);
+    // Glow effect
+    gsap.to(glowRef.current, {
+      scale: 1.2,
+      opacity: 0.3,
+      duration: 2,
+      repeat: -1,
+      yoyo: true,
+      ease: "power2.inOut",
+    });
+
+    // Particle animation
+    const particles = particlesRef.current.children;
+    gsap.to(particles, {
+      y: -100,
+      opacity: 0,
+      duration: 3,
+      stagger: 0.2,
+      repeat: -1,
+      ease: "power2.out",
+    });
+
+    return () => {
+      tl.kill();
+      progressTl.kill();
+    };
+  }, []);
+
+  const createParticles = () => {
+    return Array.from({ length: 20 }, (_, i) => (
+      <div
+        key={i}
+        className="absolute w-2 h-2 rounded-full"
+        style={{
+          background: `rgb(${Math.random() * 100 + 155}, ${
+            Math.random() * 100 + 155
+          }, ${Math.random() * 100 + 155})`,
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          animationDelay: `${Math.random() * 2}s`,
+        }}
+      />
+    ));
+  };
 
   return (
     <div
       ref={containerRef}
-      className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-gray-900 to-black p-8 relative overflow-hidden"
-      data-aos="zoom-in"
+      className="relative flex flex-col items-center justify-center min-h-screen overflow-hidden"
+      style={{
+        background: `
+          radial-gradient(circle at 20% 20%, rgb(120, 119, 198) 0%, transparent 50%),
+          radial-gradient(circle at 80% 80%, rgb(255, 119, 198) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgb(120, 219, 255) 0%, transparent 50%),
+          linear-gradient(135deg, rgb(15, 23, 42) 0%, rgb(30, 41, 59) 100%)
+        `,
+      }}
     >
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute w-40 h-40 rounded-full bg-blue-600 blur-2xl -top-8 -left-8"></div>
-        <div className="absolute w-40 h-40 rounded-full bg-purple-600 blur-2xl top-1/3 right-10"></div>
+      {/* Background particles */}
+      <div ref={particlesRef} className="absolute inset-0 pointer-events-none">
+        {createParticles()}
       </div>
 
-      {serviceImages.length > 0 && (
-        <img
-          ref={imageRef}
-          src={serviceImages[currentImageIndex]}
-          alt="Service"
-          className="w-36 h-36 rounded-xl mb-6 object-cover shadow-lg"
-          loading="lazy"
-        />
-      )}
-
+      {/* Glow effect */}
       <div
-        ref={logoRef}
-        className="w-48 h-48 mb-8 bg-gradient-to-r from-white to-gray-100 rounded-full flex items-center justify-center shadow-xl"
-      >
-        <div className="relative">
-          <div ref={scissorsRef} className="text-6xl transform origin-center">
-            ✂️
+        ref={glowRef}
+        className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle, rgb(147, 197, 253) 0%, transparent 70%)",
+          filter: "blur(60px)",
+        }}
+      />
+
+      {/* Main content */}
+      <div className="relative z-10 text-center">
+        {/* Title */}
+        <div ref={titleRef} className="mb-4">
+          <h1 className="text-6xl md:text-8xl font-black tracking-wider">
+            {salonName.split("").map((letter, index) => (
+              <span
+                key={index}
+                className="letter inline-block mx-1"
+                style={{
+                  background:
+                    "linear-gradient(45deg, rgb(147, 197, 253), rgb(196, 181, 253), rgb(251, 207, 232))",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  textShadow: "0 0 30px rgba(147, 197, 253, 0.5)",
+                }}
+              >
+                {letter}
+              </span>
+            ))}
+            <span
+              className="ml-4"
+              style={{
+                background:
+                  "linear-gradient(45deg, rgb(251, 191, 36), rgb(245, 158, 11))",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              SALON
+            </span>
+          </h1>
+        </div>
+
+        {/* Subtitle */}
+        <div ref={subtitleRef} className="mb-12">
+          <p
+            className="text-xl md:text-2xl font-light tracking-wide"
+            style={{ color: "rgb(203, 213, 225)" }}
+          >
+            Đẳng cấp làm đẹp của bạn
+          </p>
+          <div
+            className="w-32 h-1 mx-auto mt-4 rounded-full"
+            style={{
+              background:
+                "linear-gradient(90deg, rgb(147, 197, 253), rgb(196, 181, 253))",
+            }}
+          />
+        </div>
+
+        {/* Progress section */}
+        <div className="w-full max-w-md mx-auto">
+          {/* Runner character */}
+          <div className="relative mb-8 h-20">
+            <div
+              ref={runnerRef}
+              className="absolute left-0 w-16 h-16 transition-all duration-300"
+            >
+              <img
+                src="https://cdn.dribbble.com/userupload/32768031/file/original-a4e52e6c66a839f7967c349df387620c.gif"
+                alt="Running character"
+                className="w-full h-full object-contain filter drop-shadow-lg"
+              />
+            </div>
+          </div>
+
+          {/* Progress track */}
+          <div
+            ref={progressTrackRef}
+            className="relative w-full h-4 rounded-full overflow-hidden mb-4"
+            style={{
+              background: "rgba(71, 85, 105, 0.3)",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(148, 163, 184, 0.2)",
+            }}
+          >
+            <div
+              ref={progressFillRef}
+              className="h-full rounded-full transition-all duration-300 relative overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(90deg, rgb(59, 130, 246), rgb(147, 51, 234), rgb(236, 72, 153))",
+                width: "0%",
+                boxShadow: "0 0 20px rgba(59, 130, 246, 0.5)",
+              }}
+            >
+              {/* Shine effect */}
+              <div
+                className="absolute inset-0 opacity-30"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                  animation: "shine 2s infinite",
+                }}
+              />
+            </div>
+
+            {/* Progress indicators */}
+            {[25, 50, 75].map((mark) => (
+              <div
+                key={mark}
+                className="absolute top-0 w-0.5 h-full opacity-30"
+                style={{
+                  left: `${mark}%`,
+                  background: "rgb(148, 163, 184)",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Percentage */}
+          <div className="text-center">
+            <span
+              ref={percentRef}
+              className="text-4xl font-bold"
+              style={{
+                background:
+                  "linear-gradient(45deg, rgb(147, 197, 253), rgb(196, 181, 253))",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                filter: "drop-shadow(0 0 10px rgba(147, 197, 253, 0.3))",
+              }}
+            >
+              0%
+            </span>
           </div>
         </div>
-      </div>
 
-      <div ref={textRef} className="text-center mb-10">
-        <h1 className="text-5xl font-extrabold text-white tracking-tight">
-          {salonName
-            ? salonName.split("").map((letter, index) => (
-                <span key={index} className="letter inline-block">
-                  {letter}
-                </span>
-              ))
-            : ["L", "U", "X", "U", "R", "Y"].map((letter, index) => (
-                <span key={index} className="letter inline-block">
-                  {letter}
-                </span>
-              ))}
-          <span className="text-white ml-3">SALON</span>
-        </h1>
-        <p className="text-gray-200 italic text-lg mt-2">
-          Đẳng cấp làm đẹp của bạn
-        </p>
-      </div>
-
-      <div className="w-72 h-3 bg-gray-800 rounded-full overflow-hidden mb-4 shadow-inner relative">
-        <div
-          ref={progressBarRef}
-          className="h-full bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 rounded-full relative"
-        >
-          <span className="absolute inset-0 flex items-center justify-center text-white text-sm font-semibold drop-shadow">
-            Chờ một chút
+        {/* Loading text */}
+        <div className="mt-8 flex items-center justify-center gap-2">
+          <span
+            className="text-lg font-medium"
+            style={{ color: "rgb(148, 163, 184)" }}
+          >
+            Đang chuẩn bị trải nghiệm tuyệt vời
           </span>
+          <div className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="w-2 h-2 rounded-full animate-bounce"
+                style={{
+                  background: "rgb(147, 197, 253)",
+                  animationDelay: `${i * 0.15}s`,
+                }}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-
-      <div ref={percentRef} className="text-white text-lg font-semibold">
-        0%
-      </div>
-
-      <div className="mt-8 flex gap-1.5 items-center text-gray-300 text-lg">
-        <span>Đang chuẩn bị trải nghiệm tuyệt vời</span>
-        <span className="animate-bounce">.</span>
-        <span className="animate-bounce delay-100">.</span>
-        <span className="animate-bounce delay-200">.</span>
       </div>
 
       <style jsx>{`
         @keyframes shine {
           0% {
-            transform: translateX(-150%);
+            transform: translateX(-100%);
           }
           100% {
-            transform: translateX(1500%);
+            transform: translateX(400%);
           }
         }
-        .animate-shine {
-          animation: shine 2.5s infinite;
+
+        @keyframes bounce {
+          0%,
+          20%,
+          50%,
+          80%,
+          100% {
+            transform: translateY(0);
+          }
+          40% {
+            transform: translateY(-10px);
+          }
+          60% {
+            transform: translateY(-5px);
+          }
         }
-        .delay-100 {
-          animation-delay: 150ms;
-        }
-        .delay-200 {
-          animation-delay: 300ms;
+
+        .animate-bounce {
+          animation: bounce 1.4s infinite;
         }
       `}</style>
     </div>
   );
 };
 
-export default SalonLoadingScreen;
+export default PremiumSalonLoadingScreen;
