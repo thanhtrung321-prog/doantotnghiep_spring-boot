@@ -1,8 +1,10 @@
 import * as XLSX from "xlsx";
 
-export const fetchPayments = async () => {
+export const fetchPayments = async (salonId) => {
   try {
-    const response = await fetch("http://localhost:8085/payments/all");
+    const response = await fetch(
+      `http://localhost:8085/payments/payment/salon/${salonId}`
+    );
     if (!response.ok) {
       throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}`);
     }
@@ -86,8 +88,6 @@ export const updatePaymentStatus = async (paymentId, newStatus) => {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          // Nếu cần xác thực, thêm:
-          // "Authorization": `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify(newStatus),
       }

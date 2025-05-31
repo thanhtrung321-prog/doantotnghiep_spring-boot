@@ -36,6 +36,7 @@ import {
   getStatsChartData,
   updatePaymentStatus,
 } from "../../Dashboard/api/paymentowner";
+import { getUserById } from "../../Dashboard/api/Usersstaffowner";
 
 // Lazy load components
 const SalonLoadingScreen = lazy(() =>
@@ -85,6 +86,7 @@ const Payment = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [newPaymentStatus, setNewPaymentStatus] = useState("");
+  const [salonId, setSalonId] = useState(null);
   const paymentsPerPage = 5;
 
   // Refs
@@ -108,6 +110,28 @@ const Payment = () => {
   );
   const totalPages = Math.ceil(filteredPayments.length / paymentsPerPage);
 
+  // Fetch salonId from localStorage and user data
+  useEffect(() => {
+    const fetchSalonId = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+          throw new Error("Không tìm thấy userId trong localStorage.");
+        }
+        const userData = await getUserById(userId);
+        if (!userData.salonId) {
+          throw new Error("Không tìm thấy salonId trong dữ liệu người dùng.");
+        }
+        setSalonId(userData.salonId);
+      } catch (err) {
+        console.error("Lỗi khi lấy salonId:", err);
+        toast.error("Không thể tải salonId của chủ salon.");
+        setIsLoading(false);
+      }
+    };
+    fetchSalonId();
+  }, []);
+
   // Control loading screen for 1.5 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -123,8 +147,9 @@ const Payment = () => {
     AOS.init({ duration: 800, easing: "ease-out", once: true });
 
     const loadPayments = async () => {
+      if (!salonId) return; // Wait for salonId
       try {
-        const { payments, stats } = await fetchPayments();
+        const { payments, stats } = await fetchPayments(salonId);
         startTransition(() => {
           setPayments(payments);
           setFilteredPayments(payments);
@@ -136,7 +161,7 @@ const Payment = () => {
       }
     };
     loadPayments();
-  }, []);
+  }, [salonId]);
 
   // GSAP animations for header, stats, table, and no-results
   useEffect(() => {
@@ -209,7 +234,7 @@ const Payment = () => {
         sortedPayments.sort((a, b) => a.amount - b.amount);
         break;
       case "amountDesc":
-        sortedPayments.sort((a, b) => b.amount - b.amount);
+        sortedPayments.sort((a, b) => b.amount - a.amount);
         break;
       case "idAsc":
         sortedPayments.sort((a, b) => a.id - b.id);
