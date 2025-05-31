@@ -61,6 +61,7 @@ const User = () => {
   const [salon, setSalon] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [salonId, setSalonId] = useState(null);
   const [formData, setFormData] = useState({
     fullName: "",
     username: "",
@@ -68,7 +69,7 @@ const User = () => {
     phone: "",
     password: "",
     role: "STAFF",
-    salonId: 302,
+    salonId: null,
   });
   const [originalData, setOriginalData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -85,29 +86,55 @@ const User = () => {
   const salonTitleRef = useRef(null);
   const sliderRef = useRef(null);
 
-  // Fetch data
+  // Fetch owner data and salonId from localStorage
+  useEffect(() => {
+    const fetchOwnerData = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+          throw new Error("Không tìm thấy userId trong localStorage.");
+        }
+        const userData = await getUserById(userId);
+        if (!userData.salonId) {
+          throw new Error("Không tìm thấy salonId trong dữ liệu người dùng.");
+        }
+        setSalonId(userData.salonId);
+        setFormData((prev) => ({ ...prev, salonId: userData.salonId }));
+      } catch (err) {
+        console.error("Lỗi khi lấy dữ liệu người dùng:", err);
+        setError("Không thể tải salonId của chủ salon.");
+        setLoading(false);
+        toast.error("Không thể tải salonId của chủ salon.");
+      }
+    };
+    fetchOwnerData();
+  }, []);
+
+  // Fetch staff and salon data
   useEffect(() => {
     const fetchData = async () => {
+      if (!salonId) return; // Wait for salonId to be fetched
       try {
         await new Promise((resolve) => setTimeout(resolve, 1500));
         const [users, salonData] = await Promise.all([
           getAllUsers(),
-          getSalonById(302),
+          getSalonById(salonId),
         ]);
         const staffMembers = users.filter(
-          (user) => user.role === "STAFF" && user.salonId === 302
+          (user) => user.role === "STAFF" && user.salonId === salonId
         );
         setStaff(staffMembers);
         setSalon(salonData);
         setLoading(false);
       } catch (err) {
+        console.error("Lỗi khi lấy dữ liệu:", err);
         setError("Không thể tải dữ liệu.");
         setLoading(false);
         toast.error("Không thể tải dữ liệu.");
       }
     };
     fetchData();
-  }, []);
+  }, [salonId]);
 
   // GSAP animations
   useEffect(() => {
@@ -203,7 +230,7 @@ const User = () => {
           phone: "",
           password: "",
           role: "STAFF",
-          salonId: 302,
+          salonId: salonId, // Use dynamic salonId
         });
         setOriginalData(null);
         setIsEditing(false);
@@ -219,7 +246,7 @@ const User = () => {
         );
       }
     },
-    [isEditing, editingId, formData, originalData]
+    [isEditing, editingId, formData, originalData, salonId]
   );
 
   // Handle edit
@@ -344,50 +371,52 @@ const User = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <ToastContainer position="top-right" autoClose={2000} />
-      <style jsx global>{`
-        .slick-dots li button:before {
-          color: #6b7280;
-          font-size: 8px;
-        }
-        .slick-dots li.slick-active button:before {
-          color: #ec4899;
-        }
-        @media (max-width: 768px) {
-          .container {
-            padding: 0.75rem;
+      <style jsx global>
+        {`
+          .slick-dots li button:before {
+            color: #6b7280;
+            font-size: 8px;
           }
-        }
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 1000;
-          background: rgba(0, 0, 0, 0.4);
-          backdrop-filter: blur(3px);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 0.5rem;
-        }
-        .modal-content {
-          max-height: 85vh;
-          overflow-y: auto;
-          scrollbar-width: thin;
-          scrollbar-color: #ec4899 #f3f4f6;
-        }
-        .modal-content::-webkit-scrollbar {
-          width: 6px;
-        }
-        .modal-content::-webkit-scrollbar-track {
-          background: #f3f4f6;
-        }
-        .modal-content::-webkit-scrollbar-thumb {
-          background-color: #ec4899;
-          border-radius: 3px;
-        }
-      `}</style>
+          .slick-dots li.slick-active button:before {
+            color: #ec4899;
+          }
+          @media (max-width: 768px) {
+            .container {
+              padding: 0.75rem;
+            }
+          }
+          .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(3px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.5rem;
+          }
+          .modal-content {
+            max-height: 85vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #ec4899 #f3f4f6;
+          }
+          .modal-content::-webkit-scrollbar {
+            width: 6px;
+          }
+          .modal-content::-webkit-scrollbar-track {
+            background: #f3f4f6;
+          }
+          .modal-content::-webkit-scrollbar-thumb {
+            background-color: #ec4899;
+            border-radius: 3px;
+          }
+        `}
+      </style>
 
       {/* Main Content */}
       <div className={`${isAnyModalOpen ? "hidden" : "block"} relative z-10`}>
@@ -407,7 +436,7 @@ const User = () => {
               className="text-lg sm:text-xl font-semibold text-gray-700"
             >
               <FaGem className="inline mr-2 text-pink-500" />
-              {salon ? salon.name : "Salon Elite ID: 302"}
+              {salon ? salon.name : "Salon Elite"}
               <FaGem className="inline ml-2 text-purple-500" />
             </p>
             <div className="mt-4 w-20 h-1 bg-gradient-to-r from-pink-500 to-purple-500 mx-auto rounded-full"></div>
@@ -855,7 +884,7 @@ const User = () => {
                     phone: "",
                     password: "",
                     role: "STAFF",
-                    salonId: 302,
+                    salonId: salonId,
                   });
                   setOriginalData(null);
                   setShowPassword(false);
