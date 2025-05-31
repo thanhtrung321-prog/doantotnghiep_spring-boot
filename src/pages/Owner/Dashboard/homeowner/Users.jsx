@@ -426,11 +426,15 @@ const User = () => {
             <FaCrown className="text-4xl text-yellow-400 mx-auto mb-3" />
             <h1
               ref={titleRef}
-              className="text-3xl sm:text-5xl font-bold mb-3 text-gray-800"
+              className="text-3xl sm:text-5xl font-bold mb-3 
+             bg-gradient-to-r from-blue-500 via-emerald-400 to-rose-500 
+             text-transparent bg-clip-text 
+             animate-gradient-x"
               style={{ fontFamily: "'Poppins', sans-serif" }}
             >
-              PREMIUM SALON
+              QUẢN LÝ NHÂN VIÊN SALON
             </h1>
+
             <p
               ref={subtitleRef}
               className="text-lg sm:text-xl font-semibold text-gray-700"

@@ -122,11 +122,15 @@ const Payment = () => {
         if (!userData.salonId) {
           throw new Error("Không tìm thấy salonId trong dữ liệu người dùng.");
         }
-        setSalonId(userData.salonId);
+        startTransition(() => {
+          setSalonId(userData.salonId);
+        });
       } catch (err) {
         console.error("Lỗi khi lấy salonId:", err);
         toast.error("Không thể tải salonId của chủ salon.");
-        setIsLoading(false);
+        startTransition(() => {
+          setIsLoading(false);
+        });
       }
     };
     fetchSalonId();
