@@ -110,10 +110,13 @@ const Payment = () => {
   );
   const totalPages = Math.ceil(filteredPayments.length / paymentsPerPage);
 
-  // Fetch salonId from localStorage and user data
+  // Fetch salonId and payments with 1.5-second loading delay
   useEffect(() => {
-    const fetchSalonId = async () => {
+    let isMounted = true;
+
+    const initializeData = async () => {
       try {
+        // Fetch salonId
         const userId = localStorage.getItem("userId");
         if (!userId) {
           throw new Error("Không tìm thấy userId trong localStorage.");
@@ -122,55 +125,45 @@ const Payment = () => {
         if (!userData.salonId) {
           throw new Error("Không tìm thấy salonId trong dữ liệu người dùng.");
         }
-        startTransition(() => {
-          setSalonId(userData.salonId);
-        });
+
+        // Fetch payments
+        const { payments, stats } = await fetchPayments(userData.salonId);
+
+        // Update state after 1.5-second delay
+        setTimeout(() => {
+          if (isMounted) {
+            startTransition(() => {
+              setSalonId(userData.salonId);
+              setPayments(payments);
+              setFilteredPayments(payments);
+              setOriginalPayments(payments);
+              setStats({ ...stats, bookingCount: payments.length });
+              setIsLoading(false);
+            });
+          }
+        }, 1500);
       } catch (err) {
-        console.error("Lỗi khi lấy salonId:", err);
-        toast.error("Không thể tải salonId của chủ salon.");
-        startTransition(() => {
-          setIsLoading(false);
-        });
+        console.error("Lỗi khi khởi tạo dữ liệu:", err);
+        if (isMounted) {
+          startTransition(() => {
+            setIsLoading(false);
+          });
+          toast.error("Không thể tải dữ liệu ban đầu.");
+        }
       }
     };
-    fetchSalonId();
-  }, []);
 
-  // Control loading screen for 1.5 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      startTransition(() => {
-        setIsLoading(false);
-      });
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Initialize AOS and load payments
-  useEffect(() => {
     AOS.init({ duration: 800, easing: "ease-out", once: true });
+    initializeData();
 
-    const loadPayments = async () => {
-      if (!salonId) return; // Wait for salonId
-      try {
-        const { payments, stats } = await fetchPayments(salonId);
-        startTransition(() => {
-          setPayments(payments);
-          setFilteredPayments(payments);
-          setOriginalPayments(payments);
-          setStats({ ...stats, bookingCount: payments.length });
-        });
-      } catch (error) {
-        toast.error("Không thể tải dữ liệu thanh toán");
-      }
+    return () => {
+      isMounted = false;
     };
-    loadPayments();
-  }, [salonId]);
+  }, []);
 
   // GSAP animations for header, stats, table, and no-results
   useEffect(() => {
     if (!isLoading) {
-      // Header animation
       if (headerRef.current) {
         gsap.fromTo(
           headerRef.current,
@@ -179,7 +172,6 @@ const Payment = () => {
         );
       }
 
-      // Stats cards animation
       statsRef.current.forEach((card, index) => {
         if (card) {
           gsap.fromTo(
@@ -196,21 +188,14 @@ const Payment = () => {
         }
       });
 
-      // Table animation
       if (tableRef.current) {
         gsap.fromTo(
           tableRef.current,
           { opacity: 0, y: 30 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: "power2.out",
-          }
+          { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }
         );
       }
 
-      // No-results animation
       if (
         noResultsRef.current &&
         filteredPayments.length === 0 &&
@@ -219,12 +204,7 @@ const Payment = () => {
         gsap.fromTo(
           noResultsRef.current,
           { opacity: 0, scale: 0.9 },
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 0.5,
-            ease: "back.out(1.7)",
-          }
+          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.7)" }
         );
       }
     }
@@ -373,13 +353,7 @@ const Payment = () => {
       gsap.fromTo(
         modalRef.current,
         { opacity: 0, y: 100, scale: 0.9 },
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.5,
-          ease: "back.out(2)",
-        }
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(2)" }
       );
     }
   }, [isDetailModalOpen, isUserModalOpen, isChartModalOpen]);
@@ -950,21 +924,18 @@ const Payment = () => {
                           {selectedPayment.id}
                         </p>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg">
                         <p className="text-gray-400 text-sm">Số tiền</p>
                         <p className="text-white font-medium">
                           {formatCurrency(selectedPayment.amount)}
                         </p>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg">
                         <p className="text-gray-400 text-sm">Mã đặt lịch</p>
                         <p className="text-white font-medium">
                           {selectedPayment.booking_id}
                         </p>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg">
                         <p className="text-gray-400 text-sm">
                           Mã liên kết thanh toán
@@ -973,7 +944,6 @@ const Payment = () => {
                           {selectedPayment.payment_link_id}
                         </p>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg">
                         <p className="text-gray-400 text-sm">
                           Phương thức thanh toán
@@ -987,7 +957,6 @@ const Payment = () => {
                           </span>
                         </div>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg">
                         <p className="text-gray-400 text-sm">Salon</p>
                         <div className="flex items-center mt-1">
@@ -999,7 +968,6 @@ const Payment = () => {
                           </span>
                         </div>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg">
                         <p className="text-gray-400 text-sm">Trạng thái</p>
                         <select
@@ -1016,7 +984,6 @@ const Payment = () => {
                           <option value="failed">Thất bại</option>
                         </select>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg">
                         <p className="text-gray-400 text-sm">Người dùng</p>
                         <div className="flex items-center mt-1">
@@ -1028,7 +995,6 @@ const Payment = () => {
                           </span>
                         </div>
                       </div>
-
                       <div className="bg-gray-800/60 p-4 rounded-lg col-span-2">
                         <p className="text-gray-400 text-sm">Ngày thanh toán</p>
                         <div className="flex items-center mt-1">
