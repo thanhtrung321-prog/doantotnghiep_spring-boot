@@ -208,9 +208,6 @@ const Slider = ({ className = "" }) => {
 
   const handleServiceClick = useCallback((service) => {
     setSelectedService((prev) => (prev?.id === service.id ? null : service));
-    toast.info(`Đã chọn dịch vụ: ${service.name}`, {
-      style: { background: "#1a1a1a", color: "#fff" },
-    });
   }, []);
 
   const handleOfferingDetail = useCallback((offering) => {
@@ -348,16 +345,16 @@ const Slider = ({ className = "" }) => {
 
   if (isLoading) {
     return (
-      <div className="h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center">
+      <div className="h-screen mt-18 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="relative mb-6">
-            <div className="w-16 h-16 border-4 border-white/10 rounded-full animate-spin">
-              <div className="absolute top-0 left-0 w-4 h-4 bg-gradient-to-r from-pink-400 to-blue-400 rounded-full animate-pulse"></div>
+          <div className="relative mb-6 w-16 h-16 mx-auto">
+            {/* Vòng quay + chấm nhỏ quay theo */}
+            <div className="w-16 h-16 border-4 border-white/10 rounded-full animate-spin relative">
+              <div className="absolute top-[-8px] left-1/2 transform -translate-x-1/2 w-3 h-3 bg-gradient-to-r from-pink-400 to-blue-400 rounded-full"></div>
             </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Scissors className="w-6 h-6 text-white animate-bounce" />
-            </div>
-            <svg className="absolute inset-0 w-16 h-16 transform -rotate-90">
+
+            {/* Vòng SVG loading progress */}
+            <svg className="absolute inset-0 w-16 h-16 transform -rotate-90 z-0">
               <circle
                 cx="32"
                 cy="32"
@@ -370,7 +367,14 @@ const Slider = ({ className = "" }) => {
                 className="transition-all duration-300"
               />
             </svg>
+
+            {/* Icon kéo nằm giữa vòng */}
+            <div className="absolute inset-0 flex items-center justify-center z-20">
+              <Scissors className="w-6 h-6 text-white animate-bounce" />
+            </div>
           </div>
+
+          {/* Tiêu đề và mô tả */}
           <h1
             ref={(el) => (textRefs.current[0] = el)}
             className="text-xl font-bold text-white mb-2"
@@ -378,6 +382,8 @@ const Slider = ({ className = "" }) => {
             Beauty Salon
           </h1>
           <p className="text-white/70 text-sm">Đang tải trải nghiệm...</p>
+
+          {/* Thanh loading dưới */}
           <div className="w-24 h-1 bg-white/20 rounded-full mt-2 mx-auto overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-pink-400 to-blue-400 rounded-full transition-all duration-300"
@@ -391,7 +397,7 @@ const Slider = ({ className = "" }) => {
 
   return (
     <div
-      className={`relative h-[calc(100vh-128px)] overflow-hidden font-sans ${className}`}
+      className={`relative top-18 mb-18  h-[calc(100vh-128px)] overflow-hidden font-sans ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -451,7 +457,6 @@ const Slider = ({ className = "" }) => {
           onChange={(e) => setSelectedSalonId(e.target.value)}
           className="w-full p-2 rounded-lg bg-gray-900/80 text-white border border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-pink-400"
         >
-          <option value="">Chọn salon</option>
           {salons.map((salon) => (
             <option key={salon.id} value={salon.id}>
               {salon.name}
@@ -672,10 +677,10 @@ const Slider = ({ className = "" }) => {
       {salon && (
         <div className="absolute bottom-2 left-2 z-30 text-white/90 text-xs flex items-center gap-1 bg-gradient-to-r from-gray-900/80 to-gray-800/80 backdrop-blur-md px-3 py-1 rounded">
           <MapPin className="w-3 h-3" />
-          <span>{salon.address}</span>
+          <span className="text-xs">{salon.address}</span>
           <span className="mx-1">•</span>
           <Clock className="w-3 h-3" />
-          <span>
+          <span className="text-sm">
             {salon.openingTime.slice(0, 5)} - {salon.closingTime.slice(0, 5)}
           </span>
         </div>

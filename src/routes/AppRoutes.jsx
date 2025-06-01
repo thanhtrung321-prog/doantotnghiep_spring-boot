@@ -121,7 +121,6 @@ const AppRoutes = () => {
         path="/profile"
         element={
           <ProtectedRoute allowedRoles={["USER", "STAFF", "ADMIN", "OWNER"]}>
-            <Header />
             <Navbar />
             <Profileuser />
             <Footer />

@@ -10,6 +10,7 @@ const CustomerDashboard = () => {
   return (
     <>
       <CursorEffect />
+      {/* vẩn còn bị kẹt header ở profile do 2 cái trùng lặp ở nav và header  */}
       <Header />
       <Navbar />
       <Silider />
