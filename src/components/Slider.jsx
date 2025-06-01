@@ -345,7 +345,7 @@ const Slider = ({ className = "" }) => {
 
   if (isLoading) {
     return (
-      <div className="h-screen mt-18 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center">
+      <div className="h-screen mt-30 bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 flex items-center justify-center">
         <div className="text-center">
           <div className="relative mb-6 w-16 h-16 mx-auto">
             {/* Vòng quay + chấm nhỏ quay theo */}
@@ -397,7 +397,7 @@ const Slider = ({ className = "" }) => {
 
   return (
     <div
-      className={`relative top-18 mb-18  h-[calc(100vh-128px)] overflow-hidden font-sans ${className}`}
+      className={`relative mt-30  h-[calc(100vh-128px)] overflow-hidden font-sans ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
