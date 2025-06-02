@@ -31,9 +31,8 @@ import {
 } from "../../api/apiadmin/salonmanager";
 
 const Salons = () => {
-  // modal states
+  // Modal states
   const [isModalOpen, setModalOpen] = useState(false);
-  // end  modal states
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState("grid");
   const [salons, setSalons] = useState([]);
@@ -234,13 +233,28 @@ const Salons = () => {
     if (!newSalonData.email.trim()) errors.email = "Email là bắt buộc";
     else if (!/\S+@\S+\.\S+/.test(newSalonData.email))
       errors.email = "Email không hợp lệ";
-    if (!newSalonData.ownerId) errors.ownerId = "Chủ sở hữu là bắt buộc";
     return errors;
+  };
+
+  const checkOwnerAssignment = (ownerId, currentSalonId = null) => {
+    if (!ownerId) return null;
+    const assignedSalon = salons.find(
+      (salon) =>
+        salon.ownerId === parseInt(ownerId) &&
+        (!currentSalonId || salon.id !== currentSalonId)
+    );
+    return assignedSalon ? assignedSalon.name : null;
   };
 
   const handleAddSalon = async (e) => {
     e.preventDefault();
     const errors = validateForm();
+    if (newSalonData.ownerId) {
+      const assignedSalonName = checkOwnerAssignment(newSalonData.ownerId);
+      if (assignedSalonName) {
+        errors.ownerId = `Chủ sở hữu này đã được gán cho salon "${assignedSalonName}".`;
+      }
+    }
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
@@ -264,7 +278,7 @@ const Salons = () => {
         closingTime: newSalonData.closingTime + ":00",
         contact: newSalonData.contact,
         email: newSalonData.email,
-        ownerId: parseInt(newSalonData.ownerId),
+        ownerId: newSalonData.ownerId ? parseInt(newSalonData.ownerId) : null,
         images: newSalonData.images.length > 0 ? newSalonData.images : [],
       };
       const createdSalon = await createSalon(salonData);
@@ -348,6 +362,39 @@ const Salons = () => {
 
   const handleEditSalon = async () => {
     try {
+      const errors = {};
+      if (!selectedSalon.name.trim()) errors.name = "Tên salon là bắt buộc";
+      if (!selectedSalon.addressDetail && !selectedSalon.address.split("|")[3])
+        errors.addressDetail = "Địa chỉ chi tiết là bắt buộc";
+      if (!selectedSalon.city) errors.city = "Tỉnh/Thành phố là bắt buộc";
+      if (!selectedSalon.provinceId)
+        errors.provinceId = "Tỉnh/Thành phố là bắt buộc";
+      if (!selectedSalon.districtId)
+        errors.districtId = "Quận/Huyện là bắt buộc";
+      if (!selectedSalon.wardId) errors.wardId = "Phường/Xã là bắt buộc";
+      if (!selectedSalon.openingTime)
+        errors.openingTime = "Giờ mở cửa là bắt buộc";
+      if (!selectedSalon.closingTime)
+        errors.closingTime = "Giờ đóng cửa là bắt buộc";
+      if (!selectedSalon.contact.trim())
+        errors.contact = "Số điện thoại là bắt buộc";
+      if (!selectedSalon.email.trim()) errors.email = "Email là bắt buộc";
+      else if (!/\S+@\S+\.\S+/.test(selectedSalon.email))
+        errors.email = "Email không hợp lệ";
+      if (selectedSalon.ownerId) {
+        const assignedSalonName = checkOwnerAssignment(
+          selectedSalon.ownerId,
+          selectedSalon.id
+        );
+        if (assignedSalonName) {
+          errors.ownerId = `Chủ sở hữu này đã được gán cho salon "${assignedSalonName}".`;
+        }
+      }
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        return;
+      }
+
       const selectedProvince = provinces.find(
         (p) => p.id === selectedSalon.provinceId
       );
@@ -380,7 +427,7 @@ const Salons = () => {
         closingTime,
         contact: selectedSalon.contact,
         email: selectedSalon.email,
-        ownerId: parseInt(selectedSalon.ownerId),
+        ownerId: selectedSalon.ownerId ? parseInt(selectedSalon.ownerId) : null,
         images: selectedSalon.images || [],
       };
       const updatedSalon = await updateSalon(selectedSalon.id, salonData);
@@ -392,6 +439,7 @@ const Salons = () => {
       setIsEditModalOpen(false);
       setEditImagePreviews([]);
       setEditImages([]);
+      setFormErrors({});
       setModalMessage("Salon updated successfully!");
       setIsSuccessModalOpen(true);
     } catch (error) {
@@ -431,6 +479,7 @@ const Salons = () => {
     setSelectedImageIndex(index);
     setIsImageModalOpen(true);
   };
+
   const displayFullAddress = (address) => {
     return (address ?? "").split("|").filter(Boolean).join(", ");
   };
@@ -700,7 +749,7 @@ const Salons = () => {
                             <span>{salon.contact}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
                           <div className="flex items-center">
                             <Mail className="h-4 w-4 mr-1 text-gray-400" />
                             <span>{salon.email}</span>
@@ -817,7 +866,6 @@ const Salons = () => {
                       formErrors.name ? "border-red-500" : "border-gray-700"
                     } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     placeholder="Nhập tên salon"
-                    required
                   />
                   {formErrors.name && (
                     <p className="text-red-500 text-xs mt-1">
@@ -835,7 +883,6 @@ const Salons = () => {
                     className={`w-full px-4 py-2 bg-gray-800/50 border ${
                       formErrors.city ? "border-red-500" : "border-gray-700"
                     } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
-                    required
                   >
                     <option value="">Chọn Tỉnh/Thành phố</option>
                     {provinces.map((province) => (
@@ -862,7 +909,6 @@ const Salons = () => {
                         ? "border-red-500"
                         : "border-gray-700"
                     } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
-                    required
                     disabled={!newSalonData.provinceId}
                   >
                     <option value="">Chọn Quận/Huyện</option>
@@ -888,7 +934,6 @@ const Salons = () => {
                     className={`w-full px-4 py-2 bg-gray-800/50 border ${
                       formErrors.wardId ? "border-red-500" : "border-gray-700"
                     } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
-                    required
                     disabled={!newSalonData.districtId}
                   >
                     <option value="">Chọn Phường/Xã</option>
@@ -923,7 +968,6 @@ const Salons = () => {
                         : "border-gray-700"
                     } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     placeholder="Nhập số nhà, đường"
-                    required
                   />
                   {formErrors.addressDetail && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1002,7 +1046,6 @@ const Salons = () => {
                       formErrors.contact ? "border-red-500" : "border-gray-700"
                     } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     placeholder="Nhập số điện thoại"
-                    required
                   />
                   {formErrors.contact && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1027,7 +1070,6 @@ const Salons = () => {
                       formErrors.email ? "border-red-500" : "border-gray-700"
                     } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     placeholder="Nhập email"
-                    required
                   />
                   {formErrors.email && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1037,7 +1079,7 @@ const Salons = () => {
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Chủ salon
+                    Chủ salon (không bắt buộc)
                   </label>
                   <select
                     value={newSalonData.ownerId}
@@ -1050,9 +1092,8 @@ const Salons = () => {
                     className={`w-full px-4 py-2 bg-gray-800/50 border ${
                       formErrors.ownerId ? "border-red-500" : "border-gray-700"
                     } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
-                    required
                   >
-                    <option value="">Chọn chủ salon</option>
+                    <option value="">Không chọn chủ salon</option>
                     {owners.map((owner) => (
                       <option key={owner.id} value={owner.id}>
                         {owner.fullName} ({owner.email})
@@ -1139,6 +1180,7 @@ const Salons = () => {
                   setIsEditModalOpen(false);
                   setEditImagePreviews([]);
                   setEditImages([]);
+                  setFormErrors({});
                 }}
                 className="text-gray-400 hover:text-white transition"
               >
@@ -1160,8 +1202,15 @@ const Salons = () => {
                         name: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.name ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                   />
+                  {formErrors.name && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.name}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1187,7 +1236,9 @@ const Salons = () => {
                       setWardName("");
                       handleProvinceChange(e.target.value);
                     }}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.city ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                   >
                     <option value="">Chọn Tỉnh/Thành phố</option>
                     {provinces.map((province) => (
@@ -1196,6 +1247,11 @@ const Salons = () => {
                       </option>
                     ))}
                   </select>
+                  {formErrors.city && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.city}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1219,7 +1275,11 @@ const Salons = () => {
                       setWardName("");
                       handleDistrictChange(e.target.value);
                     }}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.districtId
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     disabled={!selectedSalon.provinceId}
                   >
                     <option value="">Chọn Quận/Huyện</option>
@@ -1229,6 +1289,11 @@ const Salons = () => {
                       </option>
                     ))}
                   </select>
+                  {formErrors.districtId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.districtId}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1247,7 +1312,9 @@ const Salons = () => {
                         addressDetail: "",
                       });
                     }}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.wardId ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     disabled={!selectedSalon.districtId}
                   >
                     <option value="">Chọn Phường/Xã</option>
@@ -1257,6 +1324,11 @@ const Salons = () => {
                       </option>
                     ))}
                   </select>
+                  {formErrors.wardId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.wardId}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1275,9 +1347,18 @@ const Salons = () => {
                         addressDetail: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.addressDetail
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     placeholder="Nhập số nhà, đường"
                   />
+                  {formErrors.addressDetail && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.addressDetail}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1297,8 +1378,17 @@ const Salons = () => {
                     format="HH:mm"
                     disableClock
                     clearIcon={null}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.openingTime
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                   />
+                  {formErrors.openingTime && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.openingTime}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1318,8 +1408,17 @@ const Salons = () => {
                     format="HH:mm"
                     disableClock
                     clearIcon={null}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.closingTime
+                        ? "border-red-500"
+                        : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                   />
+                  {formErrors.closingTime && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.closingTime}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1334,8 +1433,15 @@ const Salons = () => {
                         contact: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.contact ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                   />
+                  {formErrors.contact && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.contact}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1350,31 +1456,45 @@ const Salons = () => {
                         email: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.email ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                     placeholder="Nhập email"
                   />
+                  {formErrors.email && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.email}
+                    </p>
+                  )}
                 </div>
                 <div className="flex-1 min-w-[280px]">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Chủ salon
+                    Chủ salon (không bắt buộc)
                   </label>
                   <select
-                    value={selectedSalon.ownerId}
+                    value={selectedSalon.ownerId || ""}
                     onChange={(e) =>
                       setSelectedSalon({
                         ...selectedSalon,
-                        ownerId: parseInt(e.target.value),
+                        ownerId: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm"
+                    className={`w-full px-4 py-2 bg-gray-800/50 border ${
+                      formErrors.ownerId ? "border-red-500" : "border-gray-700"
+                    } rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm`}
                   >
-                    <option value="">Chọn chủ salon</option>
+                    <option value="">Không chọn chủ salon</option>
                     {owners.map((owner) => (
                       <option key={owner.id} value={owner.id}>
                         {owner.fullName} ({owner.email})
                       </option>
                     ))}
                   </select>
+                  {formErrors.ownerId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {formErrors.ownerId}
+                    </p>
+                  )}
                 </div>
                 <div className="w-full">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1440,6 +1560,7 @@ const Salons = () => {
                     setIsEditModalOpen(false);
                     setEditImagePreviews([]);
                     setEditImages([]);
+                    setFormErrors({});
                   }}
                   className="px-5 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition shadow-sm"
                 >
@@ -1508,7 +1629,6 @@ const Salons = () => {
                     >
                       {fullAddress}
                     </p>
-
                     {isModalOpen && (
                       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                         <div className="bg-[rgb(30,30,60)] text-[rgb(220,220,220)] p-6 rounded-lg shadow-lg max-w-sm w-full text-center">
@@ -1570,7 +1690,9 @@ const Salons = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">ID Chủ sở hữu</p>
-                    <p className="text-white">{selectedSalon.ownerId}</p>
+                    <p className="text-white">
+                      {selectedSalon.ownerId || "Không có"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1587,12 +1709,14 @@ const Salons = () => {
               </div>
             </div>
             <div className="flex justify-end space-x-3 pt-3 border-t border-gray-700/50">
-              <button
-                onClick={handleViewOwnerInfo}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                Thông tin chủ salon
-              </button>
+              {selectedSalon.ownerId && (
+                <button
+                  onClick={handleViewOwnerInfo}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Thông tin chủ salon
+                </button>
+              )}
               <button
                 onClick={() => setIsDetailModalOpen(false)}
                 className="px-4 py-2 bg-gray-800/70 text-gray-300 rounded-lg hover:bg-gray-700/70 transition-colors"
@@ -1708,7 +1832,7 @@ const Salons = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Số điện thoại</p>
-                  <p className="text-white">{selectedOwner.phone}</p>
+                  <p className="text-white">{selectedOwner.phone || "N/A"}</p>
                 </div>
               </div>
               <div className="flex items-center">

@@ -13,11 +13,14 @@ import { gsap } from "gsap";
 import AOS from "aos";
 import "aos/dist/aos.css";
 
+const BASE_URL = "http://localhost:8082";
+
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [scrolled, setScrolled] = useState(false);
+  const [error, setError] = useState(null);
 
   // Refs for GSAP animations
   const navRef = useRef(null);
@@ -36,12 +39,58 @@ const Navbar = () => {
     });
   }, []);
 
-  // Load user from localStorage on mount (commented out to avoid localStorage)
+  // Fetch user data on mount and when profile updates
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    const loadUserData = async () => {
+      const userId = localStorage.getItem("userId");
+      const token = localStorage.getItem("token");
+
+      if (!userId || !token) {
+        setUser(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BASE_URL}/user/${userId}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || "Không thể lấy dữ liệu người dùng"
+          );
+        }
+
+        const data = await response.json();
+        if (data && Object.keys(data).length > 0) {
+          setUser(data);
+          localStorage.setItem("user", JSON.stringify(data)); // Cache user data
+        } else {
+          throw new Error("Không tìm thấy thông tin người dùng");
+        }
+      } catch (err) {
+        setError(err.message);
+        setUser(null);
+        localStorage.removeItem("user");
+      }
+    };
+
+    loadUserData();
+
+    // Listen for profile updates
+    const handleProfileUpdate = () => {
+      loadUserData();
+    };
+
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+    return () => {
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+    };
   }, []);
 
   // Handle scroll effect with enhanced animations
@@ -50,7 +99,6 @@ const Navbar = () => {
       const isScrolled = window.scrollY > 10;
       setScrolled(isScrolled);
 
-      // Animate navbar on scroll
       if (navRef.current) {
         gsap.to(navRef.current, {
           backgroundColor: isScrolled
@@ -69,7 +117,6 @@ const Navbar = () => {
 
   // Enhanced GSAP animations
   useEffect(() => {
-    // Navbar entrance animation
     const tl = gsap.timeline();
 
     tl.fromTo(
@@ -78,7 +125,6 @@ const Navbar = () => {
       { y: 0, opacity: 1, duration: 0.8, ease: "back.out(1.7)" }
     );
 
-    // Animate nav links with stagger
     if (navLinksRef.current.length > 0) {
       gsap.fromTo(
         navLinksRef.current,
@@ -94,7 +140,6 @@ const Navbar = () => {
       );
     }
 
-    // Sparkle animations
     sparkleRefs.current.forEach((sparkle, index) => {
       if (sparkle) {
         gsap.to(sparkle, {
@@ -162,6 +207,7 @@ const Navbar = () => {
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    localStorage.removeItem("userId");
     setUser(null);
     window.location.href = "/login";
   };
@@ -352,7 +398,6 @@ const Navbar = () => {
                 </div>
                 <span className="nav-underline absolute -bottom-2 left-0 w-0 h-1 bg-gradient-to-r from-amber-500 via-amber-400 to-pink-500 rounded-full shadow-lg"></span>
 
-                {/* Hover glow effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-amber-100/0 via-amber-200/30 to-pink-100/0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
               </Link>
             ))}
