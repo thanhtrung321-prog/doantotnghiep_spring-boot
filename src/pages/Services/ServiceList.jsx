@@ -6,7 +6,9 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import * as THREE from "three";
+import { gsap } from "gsap";
+import AOS from "aos";
+import "aos/dist/aos.css";
 import {
   fetchSalons,
   fetchCategoriesBySalon,
@@ -41,59 +43,6 @@ const selectServiceAndRedirect = async (service, navigate, salonId) => {
   }
 };
 
-// Three.js Background Component
-const ThreeBackground = () => {
-  useEffect(() => {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    const renderer = new THREE.WebGLRenderer({ alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.domElement.style.position = "fixed";
-    renderer.domElement.style.top = "0";
-    renderer.domElement.style.left = "0";
-    renderer.domElement.style.zIndex = "-1";
-    renderer.domElement.style.opacity = "0.3";
-    document.body.appendChild(renderer.domElement);
-
-    const geometry = new THREE.TorusKnotGeometry(10, 3, 100, 16);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xff7800,
-      wireframe: true,
-    });
-    const torusKnot = new THREE.Mesh(geometry, material);
-    scene.add(torusKnot);
-
-    camera.position.z = 30;
-
-    const animate = () => {
-      requestAnimationFrame(animate);
-      torusKnot.rotation.x += 0.01;
-      torusKnot.rotation.y += 0.01;
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      document.body.removeChild(renderer.domElement);
-    };
-  }, []);
-
-  return null;
-};
-
 const ServiceList = () => {
   const [salons, setSalons] = useState([]);
   const [selectedSalon, setSelectedSalon] = useState("");
@@ -103,6 +52,21 @@ const ServiceList = () => {
   const [showDetails, setShowDetails] = useState(null); // { id, activeIndex }
   const [displayMode, setDisplayMode] = useState("slider"); // "slider" or "steps"
   const navigate = useNavigate();
+
+  // Initialize AOS and GSAP animations
+  useEffect(() => {
+    AOS.init({
+      duration: 1000,
+      once: true,
+    });
+
+    // GSAP animation for header text
+    gsap.fromTo(
+      ".header-text",
+      { opacity: 0, y: 50 },
+      { opacity: 1, y: 0, duration: 1.5, ease: "power3.out" }
+    );
+  }, []);
 
   // Fetch salons on mount
   useEffect(() => {
@@ -233,16 +197,15 @@ const ServiceList = () => {
 
   return (
     <div className="relative min-h-screen bg-gray-100">
-      <ThreeBackground />
       <ToastContainer />
-      <div className="container mx-auto px-4 py-16 animate-slide-in">
+      <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
-          <h3 className="text-4xl font-bold text-amber-800 mb-2">
+          <h3 className="header-text text-4xl font-bold text-amber-800 mb-2">
             Dịch Vụ Của Chúng Tôi
           </h3>
           <div className="w-24 h-1 bg-amber-600 mx-auto"></div>
         </div>
-        <div className="mb-8 text-center">
+        <div className="mb-8 text-center" data-aos="fade-up">
           <label className="block text-amber-900 font-medium mb-2">
             Chọn Salon
           </label>
@@ -263,7 +226,10 @@ const ServiceList = () => {
           </select>
         </div>
         {selectedSalon && (
-          <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <div
+            className="mb-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"
+            data-aos="fade-up"
+          >
             {categories.map((category) => (
               <button
                 key={category.id}
@@ -295,6 +261,8 @@ const ServiceList = () => {
                 key={service.id}
                 onClick={(e) => handleCardClick(e, service)}
                 className="relative bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer overflow-hidden group"
+                data-aos="fade-up"
+                data-aos-delay={services.indexOf(service) * 100}
               >
                 <img
                   src={cover.image}
@@ -342,7 +310,10 @@ const ServiceList = () => {
 
       {/* Details Modal */}
       {showDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50"
+          data-aos="zoom-in"
+        >
           <div className="bg-gradient-to-b from-gray-900 to-gray-800 rounded-2xl p-10 w-full max-w-[80%] max-h-[90vh] overflow-y-auto shadow-2xl border-2 border-cyan-400 relative">
             <button
               className="absolute top-4 right-4 text-cyan-400 hover:text-cyan-300 text-4xl font-bold transition-colors duration-200"
@@ -369,7 +340,7 @@ const ServiceList = () => {
                 </>
               );
             })()}
-            <div className="flex justify-between items-center  mb-8">
+            <div className="flex justify-between items-center mb-8">
               <div className="flex space-x-4 mt-4">
                 <button
                   className={`px-6 py-2 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 ${
@@ -540,21 +511,14 @@ const ServiceList = () => {
 
       <style>
         {`
-          .animate-slide-in {
-            animation: slideIn 0.5s ease-out;
-          }
-          @keyframes slideIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+          .relative {
+            position: relative;
           }
           @keyframes ripple {
             to {
               transform: translate(-50%, -50%) scale(3);
               opacity: 0;
             }
-          }
-          .relative {
-            position: relative;
           }
           .group:hover img {
             transform: scale(1.1);
