@@ -8,6 +8,7 @@ import {
   FaTimes,
   FaStar,
   FaGem,
+  FaGripLines,
 } from "react-icons/fa";
 import { gsap } from "gsap";
 import AOS from "aos";
@@ -21,15 +22,21 @@ const Navbar = () => {
   const [user, setUser] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const [error, setError] = useState(null);
+  const [isVisible, setIsVisible] = useState(true);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const hideTimerRef = useRef(null);
 
-  // Refs for GSAP animations
+  // Refs cho GSAP animations
   const navRef = useRef(null);
   const userMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const navLinksRef = useRef([]);
-  const sparkleRefs = useRef([]);
+  const sparkleRef = useRef([]);
+  const dragHandleRef = useRef(null);
 
-  // Initialize AOS
+  // Khởi tạo AOS
   useEffect(() => {
     AOS.init({
       duration: 800,
@@ -39,7 +46,7 @@ const Navbar = () => {
     });
   }, []);
 
-  // Fetch user data on mount and when profile updates
+  // Lấy dữ liệu người dùng khi mount và khi profile cập nhật
   useEffect(() => {
     const loadUserData = async () => {
       const userId = localStorage.getItem("userId");
@@ -69,7 +76,7 @@ const Navbar = () => {
         const data = await response.json();
         if (data && Object.keys(data).length > 0) {
           setUser(data);
-          localStorage.setItem("user", JSON.stringify(data)); // Cache user data
+          localStorage.setItem("user", JSON.stringify(data)); // Cache dữ liệu người dùng
         } else {
           throw new Error("Không tìm thấy thông tin người dùng");
         }
@@ -82,7 +89,7 @@ const Navbar = () => {
 
     loadUserData();
 
-    // Listen for profile updates
+    // Lắng nghe cập nhật profile
     const handleProfileUpdate = () => {
       loadUserData();
     };
@@ -93,12 +100,46 @@ const Navbar = () => {
     };
   }, []);
 
-  // Handle scroll effect with enhanced animations
+  // Xử lý hiệu ứng cuộn với ẩn/hiện navbar
   useEffect(() => {
     const handleScroll = () => {
-      const isScrolled = window.scrollY > 10;
+      const currentScrollY = window.scrollY;
+      const isScrolled = currentScrollY > 10;
       setScrolled(isScrolled);
 
+      // Xác định vị trí đầu trang
+      const atTop = currentScrollY === 0;
+      setIsAtTop(atTop);
+
+      // Xóa timer ẩn cũ nếu có
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+
+      // Logic hiển thị/ẩn navbar
+      if (atTop) {
+        // Ở đầu trang, luôn hiển thị navbar vĩnh viễn
+        setIsVisible(true);
+      } else if (currentScrollY > 50) {
+        // Xác định hướng cuộn
+        if (currentScrollY < lastScrollY) {
+          // Cuộn lên, hiển thị navbar trong 1 giây rồi ẩn
+          setIsVisible(true);
+          hideTimerRef.current = setTimeout(() => {
+            if (window.scrollY !== 0) {
+              setIsVisible(false);
+            }
+          }, 1000);
+        } else if (currentScrollY > lastScrollY) {
+          // Cuộn xuống, không hiển thị navbar
+          setIsVisible(false);
+        }
+      }
+
+      // Cập nhật vị trí cuộn cuối cùng
+      setLastScrollY(currentScrollY);
+
+      // Hiệu ứng nền khi cuộn
       if (navRef.current) {
         gsap.to(navRef.current, {
           backgroundColor: isScrolled
@@ -109,13 +150,113 @@ const Navbar = () => {
           ease: "power2.out",
         });
       }
+
+      // Ẩn/hiện navbar với GSAP
+      gsap.to(navRef.current, {
+        y: isVisible ? 0 : "-100%",
+        duration: 0.3,
+        ease: "power2.out",
+      });
     };
 
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, [isVisible, isAtTop, lastScrollY]);
 
-  // Enhanced GSAP animations
+  // Xử lý kéo navbar để ẩn hoặc hiện
+  useEffect(() => {
+    const handleMouseDown = (e) => {
+      if (!dragHandleRef.current || !navRef.current) return;
+
+      setIsDragging(true);
+      document.body.style.userSelect = "none"; // Ngăn chọn văn bản khi kéo
+
+      const startY = e.clientY;
+      const nav = navRef.current;
+      const navHeight = nav.offsetHeight;
+      const initialY = parseFloat(gsap.getProperty(nav, "y"));
+
+      const handleMouseMove = (e) => {
+        const deltaY = e.clientY - startY;
+        const newY = initialY + deltaY;
+
+        // Giới hạn kéo trong phạm vi từ -navHeight (ẩn hoàn toàn) đến 0 (hiện hoàn toàn)
+        const boundedY = Math.min(0, Math.max(newY, -navHeight));
+        gsap.set(nav, { y: boundedY });
+      };
+
+      const handleMouseUp = () => {
+        setIsDragging(false);
+        document.body.style.userSelect = ""; // Khôi phục chọn văn bản
+
+        const currentY = parseFloat(gsap.getProperty(nav, "y"));
+        const navHeight = nav.offsetHeight;
+
+        if (currentY < -navHeight / 2) {
+          // Kéo lên quá nửa chiều cao navbar, ẩn hoàn toàn
+          gsap.to(nav, {
+            y: "-100%",
+            duration: 0.3,
+            ease: "power2.out",
+            onComplete: () => {
+              setIsVisible(false);
+            },
+          });
+        } else {
+          // Kéo xuống hoặc không đủ để ẩn, hiện navbar trong 1 giây rồi ẩn
+          gsap.to(nav, {
+            y: 0,
+            duration: 0.3,
+            ease: "power2.out",
+            onComplete: () => {
+              setIsVisible(true);
+              if (!isAtTop) {
+                // Nếu không ở đầu trang, ẩn sau 1 giây
+                hideTimerRef.current = setTimeout(() => {
+                  if (window.scrollY !== 0) {
+                    gsap.to(nav, {
+                      y: "-100%",
+                      duration: 0.3,
+                      ease: "power2.out",
+                      onComplete: () => {
+                        setIsVisible(false);
+                      },
+                    });
+                  }
+                }, 1000);
+              }
+            },
+          });
+        }
+
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    };
+
+    if (dragHandleRef.current) {
+      dragHandleRef.current.addEventListener("mousedown", handleMouseDown);
+    }
+
+    return () => {
+      if (dragHandleRef.current) {
+        dragHandleRef.current.removeEventListener("mousedown", handleMouseDown);
+      }
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, [isAtTop]);
+
+  // Hiệu ứng GSAP nâng cao
   useEffect(() => {
     const tl = gsap.timeline();
 
@@ -140,7 +281,7 @@ const Navbar = () => {
       );
     }
 
-    sparkleRefs.current.forEach((sparkle, index) => {
+    sparkleRef.current.forEach((sparkle, index) => {
       if (sparkle) {
         gsap.to(sparkle, {
           rotation: 360,
@@ -156,7 +297,7 @@ const Navbar = () => {
     return () => tl.kill();
   }, []);
 
-  // Mobile menu animations
+  // Hiệu ứng menu mobile
   useEffect(() => {
     if (isMenuOpen && mobileMenuRef.current) {
       const tl = gsap.timeline();
@@ -181,7 +322,7 @@ const Navbar = () => {
     }
   }, [isMenuOpen]);
 
-  // User menu animations
+  // Hiệu ứng menu người dùng
   useEffect(() => {
     if (isUserMenuOpen && userMenuRef.current) {
       gsap.fromTo(
@@ -221,7 +362,7 @@ const Navbar = () => {
     { to: "/contact", label: "Liên Hệ", icon: "📞" },
   ];
 
-  // Enhanced link hover animation
+  // Hiệu ứng hover link nâng cao
   const handleLinkHover = (e, isEnter) => {
     const link = e.currentTarget;
     const underline = link.querySelector(".nav-underline");
@@ -337,7 +478,9 @@ const Navbar = () => {
   return (
     <nav
       ref={navRef}
-      className="fixed w-full z-50 top-0"
+      className={`fixed w-full z-50 top-0 transition-shadow duration-300 ${
+        isVisible ? "shadow-lg" : "shadow-none"
+      }`} // Thêm shadow khi navbar hiện
       style={{
         background: scrolled
           ? "rgba(255, 255, 255, 0.95)"
@@ -357,11 +500,11 @@ const Navbar = () => {
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-2 left-1/4 w-2 h-2 rounded-full bg-gradient-to-r from-amber-300 to-amber-400 opacity-40 animate-pulse"></div>
         <FaStar
-          ref={(el) => (sparkleRefs.current[1] = el)}
+          ref={(el) => (sparkleRef.current[1] = el)}
           className="absolute top-3 right-1/3 text-pink-300 opacity-30 text-sm"
         />
         <FaGem
-          ref={(el) => (sparkleRefs.current[2] = el)}
+          ref={(el) => (sparkleRef.current[2] = el)}
           className="absolute bottom-2 left-1/2 text-purple-300 opacity-35 text-xs"
         />
         <div className="absolute bottom-3 right-1/4 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-pink-300 to-purple-300 opacity-50 animate-bounce"></div>
@@ -431,7 +574,7 @@ const Navbar = () => {
 
                   {user && (
                     <div className="flex flex-col items-start uppercase">
-                      <span className="font-bold text-amber-900 max-w-28 truncate text-sm ">
+                      <span className="font-bold text-amber-900 max-w-28 truncate text-sm">
                         {user.fullName || user.email}
                       </span>
                       <span className="text-xs text-amber-600 opacity-75">
@@ -511,7 +654,7 @@ const Navbar = () => {
                 "0 25px 50px -12px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.3)",
             }}
           >
-            <div className="flex flex-col p-4 space-y-2 ">
+            <div className="flex flex-col p-4 space-y-2">
               {navLinks.map((link, index) => (
                 <Link
                   key={link.to}
@@ -536,6 +679,21 @@ const Navbar = () => {
                 </Link>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Drag Handle - Chỉ hiển thị khi không ở đầu trang */}
+        {!isAtTop && (
+          <div
+            ref={dragHandleRef}
+            className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 mb-2 px-4 py-1 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 text-white cursor-ns-resize transition-opacity duration-300 flex items-center space-x-1 z-50 ${
+              !isDragging ? "opacity-100" : "opacity-50"
+            } hover:opacity-100 hover:shadow-md`}
+          >
+            <FaGripLines className="h-4 w-4" />
+            <span className="text-xs font-medium">
+              {isVisible ? "Kéo để ẩn" : "Kéo để hiện"}
+            </span>
           </div>
         )}
       </div>
