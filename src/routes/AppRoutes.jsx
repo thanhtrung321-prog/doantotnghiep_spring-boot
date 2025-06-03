@@ -21,6 +21,7 @@ import Register from "../pages/Register";
 import OwnerDasboard from "../pages/Dashboard/OwnerDasboard";
 import Hairtrend from "../pages/collection/Hairtrend";
 import BeforeAfterSlider from "../pages/collection/Beforeafterslider";
+import VideoSalon from "../pages/collection/videosalon";
 // import Profile from "../pages/admin/Dashboard/homeadmin/Profile";
 
 // Component ProtectedRoute để bảo vệ các route dựa trên vai trò
@@ -63,6 +64,7 @@ const AppRoutes = () => {
             <Collection />
             <Hairtrend />
             <BeforeAfterSlider />
+            <VideoSalon />
             <Footer />
           </>
         }
