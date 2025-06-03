@@ -49,8 +49,8 @@ const ServiceList = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [services, setServices] = useState([]);
-  const [showDetails, setShowDetails] = useState(null); // { id, activeIndex }
-  const [displayMode, setDisplayMode] = useState("slider"); // "slider" or "steps"
+  const [showDetails, setShowDetails] = useState(null);
+  const [displayMode, setDisplayMode] = useState("slider");
   const navigate = useNavigate();
 
   // Initialize AOS and GSAP animations
@@ -196,7 +196,7 @@ const ServiceList = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-gray-100">
+    <div className="relative min-h-screen bg-gray-100 mt-24">
       <ToastContainer />
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
