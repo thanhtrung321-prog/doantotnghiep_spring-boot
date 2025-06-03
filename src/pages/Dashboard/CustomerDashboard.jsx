@@ -9,12 +9,12 @@ import CursorEffect from "../../components/CursorEffect";
 const CustomerDashboard = () => {
   return (
     <>
-      {/* <CursorEffect /> */}
+      <CursorEffect />
       {/* vẩn còn bị kẹt header ở profile do 2 cái trùng lặp ở nav và header  */}
       {/* <Header /> */}
-      {/* <Navbar />
+      <Navbar />
       <Silider />
-      <ServiceOverring /> */}
+      <ServiceOverring />
       <Footer />
     </>
   );
