@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Star, Heart, Eye, X } from "lucide-react";
 
 // Import images from assets with correct path
@@ -10,7 +11,7 @@ import mohican from "../../assets/imagecolection/mohican.jpg";
 import sidePart from "../../assets/imagecolection/side_part.jpg";
 import layerBay from "../../assets/imagecolection/toc-layer-mai-bay_nu.jpg";
 import cupNgan1 from "../../assets/imagecolection/toc-ngan-uon-cup-dep-nhat-cho-nu-1.jpeg";
-import cupNgan2 from "../../assets/imagecolection/toc-ngan-uon-cup-dep-nhat-cho-nu-1.jpeg"; // Duplicate image as per provided list
+import cupNgan2 from "../../assets/imagecolection/cupNgan2.jpg";
 import toclob from "../../assets/imagecolection/toclob.webp";
 import undercut from "../../assets/imagecolection/Undercut.png";
 
@@ -21,6 +22,7 @@ const Collection = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [selectedStyle, setSelectedStyle] = useState(null);
+  const navigate = useNavigate();
 
   // Updated hair style data with provided images and descriptions
   const hairStyles = [
@@ -482,7 +484,10 @@ const Collection = () => {
                 <p className="text-gray-700 mb-6">
                   {selectedStyle.description}
                 </p>
-                <button className="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-6 py-3 rounded-full font-semibold hover:from-amber-700 hover:to-orange-700 transform hover:scale-105 transition-all duration-300 shadow-lg">
+                <button
+                  onClick={() => navigate("/booking")}
+                  className="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-6 py-3 rounded-full font-semibold hover:from-amber-700 hover:to-orange-700 transform hover:scale-105 transition-all duration-300 shadow-lg"
+                >
                   Đặt Lịch Ngay
                 </button>
               </div>
