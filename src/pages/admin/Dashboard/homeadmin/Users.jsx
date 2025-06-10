@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { gsap } from "gsap";
 import AOS from "aos";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -34,6 +34,7 @@ const Users = () => {
     password: "",
     salonId: null,
   });
+  const [passwordError, setPasswordError] = useState("");
   const [salons, setSalons] = useState([]);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
@@ -93,9 +94,16 @@ const Users = () => {
         setUsers(data);
         setFilteredUsers(data);
       } catch (error) {
-        console.error("Failed to fetch users:", error);
+        console.error("Failed to fetch users:", error.message);
+        if (error.message.includes("401") || error.message.includes("403")) {
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+          localStorage.removeItem("userId");
+          window.location.href = "/login";
+        }
         setModalMessage(
-          "Không thể tải danh sách người dùng. Vui lòng thử lại."
+          error.message ||
+            "Không thể tải danh sách người dùng. Vui lòng thử lại."
         );
         setIsErrorModalOpen(true);
       } finally {
@@ -112,7 +120,7 @@ const Users = () => {
           const data = await getAllSalons();
           setSalons(data);
         } catch (error) {
-          console.error("Failed to fetch salons:", error);
+          console.error("Failed to fetch salons:", error.message);
           setModalMessage("Không thể tải danh sách salon. Vui lòng thử lại.");
           setIsErrorModalOpen(true);
         }
@@ -270,8 +278,21 @@ const Users = () => {
     }
   };
 
+  const validatePassword = (password) => {
+    if (!password || password.length < 6) {
+      setPasswordError("Mật khẩu phải có ít nhất 6 ký tự.");
+      return false;
+    }
+    setPasswordError("");
+    return true;
+  };
+
   const handleAddUser = async (e) => {
     e.preventDefault();
+    if (!validatePassword(newUserData.password)) {
+      return;
+    }
+
     try {
       const userDataToSend = { ...newUserData };
       if (newUserData.role !== "STAFF" && newUserData.role !== "OWNER") {
@@ -292,8 +313,16 @@ const Users = () => {
       setModalMessage("Thêm người dùng thành công!");
       setIsSuccessModalOpen(true);
     } catch (error) {
-      console.error("Failed to add user:", error);
-      setModalMessage("Thêm người dùng thất bại. Vui lòng thử lại.");
+      console.error("Failed to add user:", error.message);
+      if (error.message.includes("401") || error.message.includes("403")) {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        window.location.href = "/login";
+      }
+      setModalMessage(
+        error.message || "Thêm người dùng thất bại. Vui lòng thử lại."
+      );
       setIsErrorModalOpen(true);
     }
   };
@@ -322,8 +351,16 @@ const Users = () => {
       setModalMessage("Cập nhật người dùng thành công!");
       setIsSuccessModalOpen(true);
     } catch (error) {
-      console.error("Failed to update user:", error);
-      setModalMessage("Cập nhật người dùng thất bại. Vui lòng thử lại.");
+      console.error("Failed to update user:", error.message);
+      if (error.message.includes("401") || error.message.includes("403")) {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        window.location.href = "/login";
+      }
+      setModalMessage(
+        error.message || "Cập nhật người dùng thất bại. Vui lòng thử lại."
+      );
       setIsErrorModalOpen(true);
     }
   };
@@ -341,9 +378,17 @@ const Users = () => {
       setModalMessage("Xóa người dùng thành công!");
       setIsSuccessModalOpen(true);
     } catch (error) {
-      console.error("Failed to delete user:", error);
+      console.error("Failed to delete user:", error.message);
+      if (error.message.includes("401") || error.message.includes("403")) {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        window.location.href = "/login";
+      }
       setIsConfirmDeleteModalOpen(false);
-      setModalMessage("Xóa người dùng thất bại. Vui lòng thử lại.");
+      setModalMessage(
+        error.message || "Xóa người dùng thất bại. Vui lòng thử lại."
+      );
       setIsErrorModalOpen(true);
     }
   };
@@ -729,7 +774,10 @@ const Users = () => {
             <div className="flex justify-between items-center border-b border-gray-700 p-4">
               <h3 className="text-xl font-bold">Thêm người dùng mới</h3>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setPasswordError("");
+                }}
                 className="p-1 hover:bg-gray-700 rounded-full transition-all cursor-pointer"
                 onMouseEnter={handleButtonHover}
                 onMouseLeave={handleButtonLeave}
@@ -834,18 +882,26 @@ const Users = () => {
                 <input
                   type="password"
                   value={newUserData.password}
-                  onChange={(e) =>
-                    setNewUserData({ ...newUserData, password: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewUserData({
+                      ...newUserData,
+                      password: e.target.value,
+                    });
+                    validatePassword(e.target.value);
+                  }}
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   required
                 />
+                {passwordError && (
+                  <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                )}
               </div>
               <button
                 type="submit"
                 className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition-all cursor-pointer"
                 onMouseEnter={handleButtonHover}
                 onMouseLeave={handleButtonLeave}
+                disabled={!!passwordError}
               >
                 Thêm người dùng
               </button>
@@ -1221,7 +1277,7 @@ const Users = () => {
                                 setIsRoleModalOpen(false);
                                 handleDeleteUser(user.id);
                               }}
-                              className="p-2 bg-red-600 text-white rounded-full hover:bg-red-600 transition-all cursor-pointer"
+                              className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all cursor-pointer"
                               title="Xóa người dùng"
                               onMouseEnter={handleButtonHover}
                               onMouseLeave={handleButtonLeave}

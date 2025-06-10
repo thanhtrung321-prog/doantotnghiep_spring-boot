@@ -7,6 +7,15 @@ const SERVICE_API = "http://localhost:8083/service-offering";
 const SERVICE_OWNER_API = "http://localhost:8083/service-offering/salon-owner";
 const IMAGE_BASE_URL = "http://localhost:8083/service-offering-images";
 
+// Helper function to get token
+const getAuthHeader = () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error("Không tìm thấy token. Vui lòng đăng nhập.");
+  }
+  return { Authorization: `Bearer ${token.trim()}` };
+};
+
 export const fetchUserData = async (userId) => {
   if (!userId || typeof userId !== "string") {
     console.error("Invalid userId provided:", userId);
@@ -14,7 +23,9 @@ export const fetchUserData = async (userId) => {
   }
 
   try {
-    const response = await axios.get(`${USER_API}/${userId}`);
+    const response = await axios.get(`${USER_API}/${userId}`, {
+      headers: getAuthHeader(),
+    });
     const user = response.data;
     if (user.role !== "OWNER" || !user.salonId) {
       throw new Error(
@@ -24,6 +35,12 @@ export const fetchUserData = async (userId) => {
     return user;
   } catch (error) {
     console.error("Error fetching user data:", error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(
       error.response?.data?.message || "Không thể tải thông tin người dùng"
     );
@@ -37,10 +54,18 @@ export const fetchSalonData = async (salonId) => {
   }
 
   try {
-    const response = await axios.get(`${SALON_API}/${salonId}`);
+    const response = await axios.get(`${SALON_API}/${salonId}`, {
+      headers: getAuthHeader(),
+    });
     return response.data;
   } catch (error) {
     console.error(`Error fetching salon data for salon ${salonId}:`, error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(
       error.response?.data?.message || "Không thể tải thông tin salon"
     );
@@ -54,10 +79,18 @@ export const fetchCategoriesBySalon = async (salonId) => {
   }
 
   try {
-    const response = await axios.get(`${CATEGORY_API}/${salonId}`);
+    const response = await axios.get(`${CATEGORY_API}/${salonId}`, {
+      headers: getAuthHeader(),
+    });
     return response.data;
   } catch (error) {
     console.error(`Error fetching categories for salon ${salonId}:`, error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(
       error.response?.data?.message || "Không thể tải danh sách danh mục"
     );
@@ -71,10 +104,18 @@ export const fetchServicesBySalon = async (salonId) => {
   }
 
   try {
-    const response = await axios.get(`${SERVICE_API}/salon/${salonId}`);
+    const response = await axios.get(`${SERVICE_API}/salon/${salonId}`, {
+      headers: getAuthHeader(),
+    });
     return response.data;
   } catch (error) {
     console.error(`Error fetching services for salon ${salonId}:`, error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(
       error.response?.data?.message || "Không thể tải danh sách dịch vụ"
     );
@@ -84,11 +125,20 @@ export const fetchServicesBySalon = async (salonId) => {
 export const createService = async (serviceData) => {
   try {
     const response = await axios.post(SERVICE_OWNER_API, serviceData, {
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeader(),
+      },
     });
     return response.data;
   } catch (error) {
     console.error("Error creating service:", error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(error.response?.data?.message || "Không thể tạo dịch vụ");
   }
 };
@@ -99,12 +149,21 @@ export const updateService = async (serviceId, serviceData) => {
       `${SERVICE_OWNER_API}/${serviceId}`,
       serviceData,
       {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeader(),
+        },
       }
     );
     return response.data;
   } catch (error) {
     console.error(`Error updating service ${serviceId}:`, error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(
       error.response?.data?.message || "Không thể cập nhật dịch vụ"
     );
@@ -113,10 +172,18 @@ export const updateService = async (serviceId, serviceData) => {
 
 export const deleteService = async (serviceId) => {
   try {
-    await axios.delete(`${SERVICE_OWNER_API}/${serviceId}`);
+    await axios.delete(`${SERVICE_OWNER_API}/${serviceId}`, {
+      headers: getAuthHeader(),
+    });
     return true;
   } catch (error) {
     console.error(`Error deleting service ${serviceId}:`, error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(error.response?.data?.message || "Không thể xóa dịch vụ");
   }
 };

@@ -1,24 +1,24 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../assets/register.css"; // File CSS riêng cho Register
-import { FaGoogle, FaFacebook } from "react-icons/fa"; // Icon cho Google và Facebook
-import { motion } from "framer-motion"; // Animation library
-import registerUser from "../utils/registerUser"; // Import registerUser từ utils
+import { motion } from "framer-motion";
+import { loginUser } from "../utils/loginUser";
 
 const Register = () => {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [showSuccessModal, setShowSuccessModal] = useState(false); // State để hiển thị modal
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Xử lý submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
 
-    if (!name || !email || !password || !confirmPassword) {
+    if (!fullName || !username || !email || !password || !confirmPassword) {
       setError("Vui lòng điền đầy đủ thông tin!");
       return;
     }
@@ -30,40 +30,27 @@ const Register = () => {
 
     try {
       const userData = {
-        full_name: name,
+        fullName,
+        username,
         email,
         password,
-        phone: "",
-        username: email.split("@")[0],
+        phone: null,
         role: "USER",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        salonId: null,
       };
 
-      await registerUser(userData);
-      setShowSuccessModal(true); // Hiển thị modal khi đăng ký thành công
+      const registeredUser = await registerUser(userData);
+      setShowSuccessModal(true);
     } catch (err) {
       setError(err.message || "Đăng ký thất bại. Vui lòng thử lại!");
     }
   };
 
-  // Xử lý đóng modal và chuyển hướng
   const handleCloseModal = () => {
     setShowSuccessModal(false);
     navigate("/login");
   };
 
-  // Xử lý đăng ký Google
-  const handleGoogleRegister = () => {
-    console.log("Đăng ký bằng Google");
-  };
-
-  // Xử lý đăng ký Facebook
-  const handleFacebookRegister = () => {
-    console.log("Đăng ký bằng Facebook");
-  };
-
-  // Animation variants cho form
   const containerVariants = {
     hidden: { opacity: 0, y: 50 },
     visible: {
@@ -73,7 +60,6 @@ const Register = () => {
     },
   };
 
-  // Animation variants cho modal
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.8 },
     visible: {
@@ -96,14 +82,22 @@ const Register = () => {
           Tham gia ngay để trải nghiệm dịch vụ đỉnh cao!
         </p>
 
-        {/* Form đăng ký */}
         <form onSubmit={handleSubmit} className="register-form">
           <div className="input-group">
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               placeholder="Họ và tên"
+              className="register-input"
+            />
+          </div>
+          <div className="input-group">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Tên đăng nhập"
               className="register-input"
             />
           </div>
@@ -145,38 +139,11 @@ const Register = () => {
           </motion.button>
         </form>
 
-        {/* Đường phân cách */}
-        <div className="divider">
-          <span>Hoặc đăng ký bằng</span>
-        </div>
-
-        {/* Nút đăng ký Google và Facebook */}
-        <div className="social-register">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleGoogleRegister}
-            className="social-button google"
-          >
-            <FaGoogle className="social-icon" /> Google
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleFacebookRegister}
-            className="social-button facebook"
-          >
-            <FaFacebook className="social-icon" /> Facebook
-          </motion.button>
-        </div>
-
-        {/* Link đăng nhập */}
         <p className="login-link">
           Đã có tài khoản? <Link to="/login">Đăng nhập ngay</Link>
         </p>
       </motion.div>
 
-      {/* Modal thông báo thành công */}
       {showSuccessModal && (
         <div className="modal-overlay">
           <motion.div
@@ -202,6 +169,52 @@ const Register = () => {
       )}
     </div>
   );
+};
+
+const registerUser = async (newUser) => {
+  try {
+    const response = await fetch("http://localhost:8082/user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newUser),
+    });
+
+    if (!response.ok) {
+      let errorMessage = "Đăng ký thất bại! Vui lòng kiểm tra lại thông tin.";
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        if (response.statusText === "Failed to fetch") {
+          errorMessage =
+            "Không thể kết nối đến server. Vui lòng kiểm tra backend.";
+        }
+      }
+      throw new Error(errorMessage);
+    }
+
+    const createdUser = await response.json();
+
+    if (!createdUser.email || !createdUser.username) {
+      throw new Error("Dữ liệu từ server không hợp lệ!");
+    }
+
+    const { password, ...safeUserData } = createdUser;
+
+    const loginResponse = await loginUser(newUser.email, newUser.password);
+
+    localStorage.setItem("token", loginResponse.token);
+    localStorage.setItem("user", JSON.stringify(safeUserData));
+    localStorage.setItem("userId", safeUserData.id.toString());
+
+    console.log("Đăng ký thành công:", safeUserData);
+    return safeUserData;
+  } catch (error) {
+    console.error("Lỗi khi đăng ký:", error.message);
+    throw error;
+  }
 };
 
 export default Register;

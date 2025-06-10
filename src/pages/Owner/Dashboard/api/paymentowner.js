@@ -1,14 +1,28 @@
+import axios from "axios";
 import * as XLSX from "xlsx";
+
+const PAYMENT_API = "http://localhost:8085/payments";
+const SALON_API = "http://localhost:8084/salon";
+const USER_API = "http://localhost:8082/user";
+
+// Helper function to get token
+const getAuthHeader = () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    throw new Error("Không tìm thấy token. Vui lòng đăng nhập.");
+  }
+  return { Authorization: `Bearer ${token.trim()}` };
+};
 
 export const fetchPayments = async (salonId) => {
   try {
-    const response = await fetch(
-      `http://localhost:8085/payments/payment/salon/${salonId}`
+    const response = await axios.get(
+      `${PAYMENT_API}/payment/salon/${salonId}`,
+      {
+        headers: getAuthHeader(),
+      }
     );
-    if (!response.ok) {
-      throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}`);
-    }
-    const data = await response.json();
+    const data = response.data;
     const mappedPayments = await Promise.all(
       data.payments.map(async (payment) => {
         const [salonDetails, userDetails] = await Promise.all([
@@ -42,6 +56,12 @@ export const fetchPayments = async (salonId) => {
     };
   } catch (error) {
     console.error("Lỗi khi tải danh sách thanh toán:", error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     return {
       payments: [],
       stats: { totalRevenue: 0, totalTransactions: 0, successRate: 0 },
@@ -51,26 +71,36 @@ export const fetchPayments = async (salonId) => {
 
 export const fetchSalonDetails = async (salonId) => {
   try {
-    const response = await fetch(`http://localhost:8084/salon/${salonId}`);
-    if (!response.ok) {
-      throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}`);
-    }
-    return await response.json();
+    const response = await axios.get(`${SALON_API}/${salonId}`, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
   } catch (error) {
     console.error("Lỗi khi tải chi tiết salon:", error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     return null;
   }
 };
 
 export const fetchUserDetails = async (userId) => {
   try {
-    const response = await fetch(`http://localhost:8082/user/${userId}`);
-    if (!response.ok) {
-      throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}`);
-    }
-    return await response.json();
+    const response = await axios.get(`${USER_API}/${userId}`, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
   } catch (error) {
     console.error("Lỗi khi tải chi tiết người dùng:", error);
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
     return null;
   }
 };
@@ -82,23 +112,17 @@ export const updatePaymentStatus = async (paymentId, newStatus) => {
       newStatus,
       payload: JSON.stringify(newStatus),
     });
-    const response = await fetch(
-      `http://localhost:8085/payments/status/${paymentId}`,
+    const response = await axios.put(
+      `${PAYMENT_API}/status/${paymentId}`,
+      newStatus,
       {
-        method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeader(),
         },
-        body: JSON.stringify(newStatus),
       }
     );
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Lỗi HTTP! Trạng thái: ${response.status}, Thông báo: ${errorText}`
-      );
-    }
-    const updatedPayment = await response.json();
+    const updatedPayment = response.data;
     console.log("Phản hồi cập nhật thanh toán:", updatedPayment);
     return {
       id: updatedPayment.id,
@@ -114,7 +138,16 @@ export const updatePaymentStatus = async (paymentId, newStatus) => {
     };
   } catch (error) {
     console.error("Lỗi khi cập nhật trạng thái thanh toán:", error);
-    throw error;
+    if (
+      error.response &&
+      (error.response.status === 401 || error.response.status === 403)
+    ) {
+      throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+    }
+    throw new Error(
+      error.response?.data?.message ||
+        "Không thể cập nhật trạng thái thanh toán"
+    );
   }
 };
 

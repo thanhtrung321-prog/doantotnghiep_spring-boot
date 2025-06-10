@@ -1,6 +1,8 @@
+import { loginUser } from "../utils/loginUser";
+
 const registerUser = async (newUser) => {
   try {
-    // Gửi yêu cầu POST tới API
+    // Send POST request to register endpoint
     const response = await fetch("http://localhost:8082/user", {
       method: "POST",
       headers: {
@@ -9,32 +11,46 @@ const registerUser = async (newUser) => {
       body: JSON.stringify(newUser),
     });
 
-    // Kiểm tra nếu phản hồi không thành công
+    // Check if response is not successful
     if (!response.ok) {
-      const errorText = await response.text(); // Lấy thông tin lỗi từ server nếu có
-      throw new Error(
-        errorText || "Đăng ký thất bại! Vui lòng kiểm tra lại thông tin."
-      );
+      let errorMessage = "Đăng ký thất bại! Vui lòng kiểm tra lại thông tin.";
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // Handle non-JSON responses or network errors
+        if (response.statusText === "Failed to fetch") {
+          errorMessage =
+            "Không thể kết nối đến server. Vui lòng kiểm tra backend.";
+        }
+      }
+      throw new Error(errorMessage);
     }
 
-    // Parse dữ liệu trả về từ API
+    // Parse the response data
     const createdUser = await response.json();
 
-    // Kiểm tra dữ liệu trả về có hợp lệ không
-    if (!createdUser.email || !createdUser.password) {
+    // Verify essential user data
+    if (!createdUser.email || !createdUser.username) {
       throw new Error("Dữ liệu từ server không hợp lệ!");
     }
 
-    // Giả lập token và lưu vào localStorage
-    const fakeToken = btoa(`${createdUser.email}:${createdUser.password}`);
-    localStorage.setItem("token", fakeToken);
-    localStorage.setItem("user", JSON.stringify(createdUser));
+    // Remove password from user data for safety
+    const { password, ...safeUserData } = createdUser;
 
-    console.log("Đăng ký thành công:", createdUser);
-    return createdUser;
+    // Auto-login after successful registration
+    const loginResponse = await loginUser(newUser.email, newUser.password);
+
+    // Store token and user data in localStorage
+    localStorage.setItem("token", loginResponse.token);
+    localStorage.setItem("user", JSON.stringify(safeUserData));
+    localStorage.setItem("userId", safeUserData.id.toString());
+
+    console.log("Đăng ký thành công:", safeUserData);
+    return safeUserData;
   } catch (error) {
     console.error("Lỗi khi đăng ký:", error.message);
-    throw error; // Ném lỗi để component gọi hàm này xử lý
+    throw error; // Re-throw error for component to handle
   }
 };
 

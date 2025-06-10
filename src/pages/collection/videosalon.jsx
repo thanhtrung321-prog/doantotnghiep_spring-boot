@@ -168,8 +168,6 @@ const VideoSalon = () => {
           <p className="text-xl md:text-2xl mb-12 text-gray-200 max-w-3xl mx-auto leading-relaxed">
             Nơi nghệ thuật tạo mẫu tóc gặp gỡ công nghệ hiện đại.
           </p>
-
-          {/* Video Preview Button */}
           <div className="flex flex-col items-center gap-8">
             <button
               onClick={() => setShowVideo(true)}

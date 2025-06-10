@@ -70,8 +70,10 @@ const Profileuser = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       const userId = localStorage.getItem("userId");
-      if (!userId) {
-        setErrorMessage("Vui lòng đăng nhập để xem hồ sơ");
+      const token = localStorage.getItem("token");
+
+      if (!userId || !token) {
+        setErrorMessage("Vui lòng đăng nhập để xem hồ sơ.");
         setIsLoading(false);
         return;
       }
@@ -89,7 +91,14 @@ const Profileuser = () => {
           newPassword: "",
         });
       } catch (error) {
-        setErrorMessage(error.message || "Không thể tải hồ sơ");
+        console.error("Lỗi khi tải hồ sơ:", error.message);
+        if (error.message.includes("401") || error.message.includes("403")) {
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+          localStorage.removeItem("userId");
+          window.location.href = "/login";
+        }
+        setErrorMessage(error.message || "Không thể tải hồ sơ.");
       } finally {
         setIsLoading(false);
       }
@@ -177,8 +186,10 @@ const Profileuser = () => {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     const userId = localStorage.getItem("userId");
-    if (!userId) {
-      setErrorMessage("Vui lòng đăng nhập để chỉnh sửa hồ sơ");
+    const token = localStorage.getItem("token");
+
+    if (!userId || !token) {
+      setErrorMessage("Vui lòng đăng nhập để chỉnh sửa hồ sơ.");
       return;
     }
 
@@ -191,16 +202,18 @@ const Profileuser = () => {
         }
       });
 
-      if (editForm.oldPassword && editForm.newPassword) {
-        updatedFields.oldPassword = editForm.oldPassword;
+      // Handle password update
+      if (editForm.oldPassword || editForm.newPassword) {
+        if (!editForm.oldPassword || !editForm.newPassword) {
+          setErrorMessage("Vui lòng nhập cả mật khẩu cũ và mới.");
+          return;
+        }
+        // Note: Backend doesn't validate oldPassword, so we only send newPassword
         updatedFields.newPassword = editForm.newPassword;
-      } else if (editForm.oldPassword || editForm.newPassword) {
-        setErrorMessage("Vui lòng nhập cả mật khẩu cũ và mới");
-        return;
       }
 
       if (Object.keys(updatedFields).length === 0) {
-        setErrorMessage("Không có thay đổi để lưu");
+        setErrorMessage("Không có thay đổi để lưu.");
         return;
       }
 
@@ -211,22 +224,39 @@ const Profileuser = () => {
         email: updatedFields.email || originalUser.email,
         phone: updatedFields.phone || originalUser.phone || "",
         role: originalUser.role,
-        password: updatedFields.newPassword || originalUser.password,
+        newPassword: updatedFields.newPassword || undefined, // Send newPassword if provided
         salonId: originalUser.salonId,
       };
 
-      await updateUser(userId, payload);
-      setEditForm((prev) => ({ ...prev, oldPassword: "", newPassword: "" }));
+      const updatedUser = await updateUser(userId, payload);
+      setUser(updatedUser); // Update local user state
+      setOriginalUser(updatedUser);
+      setEditForm((prev) => ({
+        ...prev,
+        fullName: updatedUser.fullName || "",
+        email: updatedUser.email || "",
+        phone: updatedUser.phone || "",
+        username: updatedUser.username || "",
+        oldPassword: "",
+        newPassword: "",
+      }));
       setErrorMessage("");
       setIsEditModalOpen(false);
       setIsSuccessModalOpen(true);
 
-      // Refresh page after success
+      // Refresh page after success (optional, since state is updated)
       setTimeout(() => {
-        window.location.reload();
+        setIsSuccessModalOpen(false);
       }, 1000);
     } catch (error) {
-      setErrorMessage(error.message || "Cập nhật hồ sơ thất bại");
+      console.error("Lỗi khi cập nhật hồ sơ:", error.message);
+      if (error.message.includes("401") || error.message.includes("403")) {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        window.location.href = "/login";
+      }
+      setErrorMessage(error.message || "Cập nhật hồ sơ thất bại.");
     }
   };
 
@@ -265,13 +295,13 @@ const Profileuser = () => {
           <p className="text-gray-600 mb-6">
             {errorMessage || "Vui lòng đăng nhập để xem hồ sơ"}
           </p>
-          <button
-            onClick={() => alert("Chức năng đăng nhập đang phát triển!")}
+          <Link
+            to="/login"
             className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500 to-pink-500 text-white px-8 py-3 rounded-full hover:shadow-lg transform hover:scale-105 transition-all"
           >
             <FaUser />
             <span>Đăng nhập</span>
-          </button>
+          </Link>
         </div>
       </div>
     );

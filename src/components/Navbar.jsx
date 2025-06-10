@@ -28,7 +28,6 @@ const Navbar = () => {
   const [lastScrollY, setLastScrollY] = useState(0);
   const hideTimerRef = useRef(null);
 
-  // Refs cho GSAP animations
   const navRef = useRef(null);
   const userMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
@@ -36,7 +35,6 @@ const Navbar = () => {
   const sparkleRef = useRef([]);
   const dragHandleRef = useRef(null);
 
-  // Khởi tạo AOS
   useEffect(() => {
     AOS.init({
       duration: 800,
@@ -46,7 +44,6 @@ const Navbar = () => {
     });
   }, []);
 
-  // Lấy dữ liệu người dùng khi mount và khi profile cập nhật
   useEffect(() => {
     const loadUserData = async () => {
       const userId = localStorage.getItem("userId");
@@ -62,12 +59,20 @@ const Navbar = () => {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${token.trim()}`, // Trim token to avoid whitespace issues
           },
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
+          if (response.status === 401 || response.status === 403) {
+            // Handle invalid or expired token
+            localStorage.removeItem("user");
+            localStorage.removeItem("token");
+            localStorage.removeItem("userId");
+            setUser(null);
+            throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+          }
+          const errorData = await response.json().catch(() => ({}));
           throw new Error(
             errorData.message || "Không thể lấy dữ liệu người dùng"
           );
@@ -76,20 +81,24 @@ const Navbar = () => {
         const data = await response.json();
         if (data && Object.keys(data).length > 0) {
           setUser(data);
-          localStorage.setItem("user", JSON.stringify(data)); // Cache dữ liệu người dùng
+          localStorage.setItem("user", JSON.stringify(data));
         } else {
           throw new Error("Không tìm thấy thông tin người dùng");
         }
       } catch (err) {
+        console.error("Lỗi khi lấy dữ liệu người dùng:", err.message);
         setError(err.message);
         setUser(null);
-        localStorage.removeItem("user");
+        if (err.message.includes("đăng nhập lại")) {
+          window.location.href = "/login";
+        } else {
+          localStorage.removeItem("user");
+        }
       }
     };
 
     loadUserData();
 
-    // Lắng nghe cập nhật profile
     const handleProfileUpdate = () => {
       loadUserData();
     };
@@ -100,30 +109,23 @@ const Navbar = () => {
     };
   }, []);
 
-  // Xử lý hiệu ứng cuộn với ẩn/hiện navbar
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       const isScrolled = currentScrollY > 10;
       setScrolled(isScrolled);
 
-      // Xác định vị trí đầu trang
       const atTop = currentScrollY === 0;
       setIsAtTop(atTop);
 
-      // Xóa timer ẩn cũ nếu có
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
       }
 
-      // Logic hiển thị/ẩn navbar
       if (atTop) {
-        // Ở đầu trang, luôn hiển thị navbar vĩnh viễn
         setIsVisible(true);
       } else if (currentScrollY > 50) {
-        // Xác định hướng cuộn
         if (currentScrollY < lastScrollY) {
-          // Cuộn lên, hiển thị navbar trong 1 giây rồi ẩn
           setIsVisible(true);
           hideTimerRef.current = setTimeout(() => {
             if (window.scrollY !== 0) {
@@ -131,15 +133,12 @@ const Navbar = () => {
             }
           }, 1000);
         } else if (currentScrollY > lastScrollY) {
-          // Cuộn xuống, không hiển thị navbar
           setIsVisible(false);
         }
       }
 
-      // Cập nhật vị trí cuộn cuối cùng
       setLastScrollY(currentScrollY);
 
-      // Hiệu ứng nền khi cuộn
       if (navRef.current) {
         gsap.to(navRef.current, {
           backgroundColor: isScrolled
@@ -151,7 +150,6 @@ const Navbar = () => {
         });
       }
 
-      // Ẩn/hiện navbar với GSAP
       gsap.to(navRef.current, {
         y: isVisible ? 0 : "-100%",
         duration: 0.3,
@@ -168,13 +166,12 @@ const Navbar = () => {
     };
   }, [isVisible, isAtTop, lastScrollY]);
 
-  // Xử lý kéo navbar để ẩn hoặc hiện
   useEffect(() => {
     const handleMouseDown = (e) => {
       if (!dragHandleRef.current || !navRef.current) return;
 
       setIsDragging(true);
-      document.body.style.userSelect = "none"; // Ngăn chọn văn bản khi kéo
+      document.body.style.userSelect = "none";
 
       const startY = e.clientY;
       const nav = navRef.current;
@@ -184,31 +181,25 @@ const Navbar = () => {
       const handleMouseMove = (e) => {
         const deltaY = e.clientY - startY;
         const newY = initialY + deltaY;
-
-        // Giới hạn kéo trong phạm vi từ -navHeight (ẩn hoàn toàn) đến 0 (hiện hoàn toàn)
         const boundedY = Math.min(0, Math.max(newY, -navHeight));
         gsap.set(nav, { y: boundedY });
       };
 
       const handleMouseUp = () => {
         setIsDragging(false);
-        document.body.style.userSelect = ""; // Khôi phục chọn văn bản
+        document.body.style.userSelect = "";
 
         const currentY = parseFloat(gsap.getProperty(nav, "y"));
         const navHeight = nav.offsetHeight;
 
         if (currentY < -navHeight / 2) {
-          // Kéo lên quá nửa chiều cao navbar, ẩn hoàn toàn
           gsap.to(nav, {
             y: "-100%",
             duration: 0.3,
             ease: "power2.out",
-            onComplete: () => {
-              setIsVisible(false);
-            },
+            onComplete: () => setIsVisible(false),
           });
         } else {
-          // Kéo xuống hoặc không đủ để ẩn, hiện navbar trong 1 giây rồi ẩn
           gsap.to(nav, {
             y: 0,
             duration: 0.3,
@@ -216,16 +207,13 @@ const Navbar = () => {
             onComplete: () => {
               setIsVisible(true);
               if (!isAtTop) {
-                // Nếu không ở đầu trang, ẩn sau 1 giây
                 hideTimerRef.current = setTimeout(() => {
                   if (window.scrollY !== 0) {
                     gsap.to(nav, {
                       y: "-100%",
                       duration: 0.3,
                       ease: "power2.out",
-                      onComplete: () => {
-                        setIsVisible(false);
-                      },
+                      onComplete: () => setIsVisible(false),
                     });
                   }
                 }, 1000);
@@ -256,10 +244,8 @@ const Navbar = () => {
     };
   }, [isAtTop]);
 
-  // Hiệu ứng GSAP nâng cao
   useEffect(() => {
     const tl = gsap.timeline();
-
     tl.fromTo(
       navRef.current,
       { y: -100, opacity: 0 },
@@ -297,11 +283,9 @@ const Navbar = () => {
     return () => tl.kill();
   }, []);
 
-  // Hiệu ứng menu mobile
   useEffect(() => {
     if (isMenuOpen && mobileMenuRef.current) {
       const tl = gsap.timeline();
-
       tl.fromTo(
         mobileMenuRef.current,
         { height: 0, opacity: 0 },
@@ -322,17 +306,11 @@ const Navbar = () => {
     }
   }, [isMenuOpen]);
 
-  // Hiệu ứng menu người dùng
   useEffect(() => {
     if (isUserMenuOpen && userMenuRef.current) {
       gsap.fromTo(
         userMenuRef.current,
-        {
-          y: -20,
-          opacity: 0,
-          scale: 0.8,
-          rotationX: -15,
-        },
+        { y: -20, opacity: 0, scale: 0.8, rotationX: -15 },
         {
           y: 0,
           opacity: 1,
@@ -362,7 +340,6 @@ const Navbar = () => {
     { to: "/contact", label: "Liên Hệ", icon: "📞" },
   ];
 
-  // Hiệu ứng hover link nâng cao
   const handleLinkHover = (e, isEnter) => {
     const link = e.currentTarget;
     const underline = link.querySelector(".nav-underline");
@@ -370,19 +347,13 @@ const Navbar = () => {
     const icon = link.querySelector(".nav-icon");
 
     if (isEnter) {
-      gsap.to(underline, {
-        width: "100%",
-        duration: 0.4,
-        ease: "power2.out",
-      });
-
+      gsap.to(underline, { width: "100%", duration: 0.4, ease: "power2.out" });
       gsap.to(text, {
         y: -2,
         color: "#d97706",
         duration: 0.3,
         ease: "power2.out",
       });
-
       gsap.to(icon, {
         scale: 1.3,
         rotation: 10,
@@ -390,19 +361,13 @@ const Navbar = () => {
         ease: "back.out(1.7)",
       });
     } else {
-      gsap.to(underline, {
-        width: "0%",
-        duration: 0.4,
-        ease: "power2.out",
-      });
-
+      gsap.to(underline, { width: "0%", duration: 0.4, ease: "power2.out" });
       gsap.to(text, {
         y: 0,
         color: "#92400e",
         duration: 0.3,
         ease: "power2.out",
       });
-
       gsap.to(icon, {
         scale: 1,
         rotation: 0,
@@ -480,7 +445,7 @@ const Navbar = () => {
       ref={navRef}
       className={`fixed w-full z-50 top-0 transition-shadow duration-300 ${
         isVisible ? "shadow-lg" : "shadow-none"
-      }`} // Thêm shadow khi navbar hiện
+      }`}
       style={{
         background: scrolled
           ? "rgba(255, 255, 255, 0.95)"
@@ -496,7 +461,6 @@ const Navbar = () => {
       data-aos="fade-down"
       data-aos-duration="800"
     >
-      {/* Floating sparkles */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-2 left-1/4 w-2 h-2 rounded-full bg-gradient-to-r from-amber-300 to-amber-400 opacity-40 animate-pulse"></div>
         <FaStar
@@ -516,7 +480,6 @@ const Navbar = () => {
             <Header />
           </div>
 
-          {/* Desktop Menu */}
           <div
             className="hidden lg:flex items-center space-x-8"
             data-aos="fade-left"
@@ -540,12 +503,10 @@ const Navbar = () => {
                   </span>
                 </div>
                 <span className="nav-underline absolute -bottom-2 left-0 w-0 h-1 bg-gradient-to-r from-amber-500 via-amber-400 to-pink-500 rounded-full shadow-lg"></span>
-
                 <div className="absolute inset-0 bg-gradient-to-r from-amber-100/0 via-amber-200/30 to-pink-100/0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
               </Link>
             ))}
 
-            {/* Enhanced Desktop User Menu */}
             <div className="relative" data-aos="fade-left" data-aos-delay="600">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -557,7 +518,6 @@ const Navbar = () => {
                 }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-amber-200/20 to-pink-200/20 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-
                 <div className="relative z-10 flex items-center space-x-3">
                   <div className="relative">
                     <div
@@ -571,7 +531,6 @@ const Navbar = () => {
                     </div>
                     <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-pink-400 to-purple-400 rounded-full animate-pulse"></div>
                   </div>
-
                   {user && (
                     <div className="flex flex-col items-start uppercase">
                       <span className="font-bold text-amber-900 max-w-28 truncate text-sm">
@@ -583,7 +542,6 @@ const Navbar = () => {
                       </span>
                     </div>
                   )}
-
                   <FaChevronDown
                     className={`h-3 w-3 text-amber-700 transition-all duration-300 ${
                       isUserMenuOpen ? "rotate-180 text-amber-500" : ""
@@ -595,13 +553,11 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Mobile Menu Controls */}
           <div
             className="lg:hidden flex items-center space-x-4"
             data-aos="fade-left"
             data-aos-delay="300"
           >
-            {/* Mobile User Menu */}
             <div className="relative">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -619,7 +575,6 @@ const Navbar = () => {
               {isUserMenuOpen && <UserMenu isMobile />}
             </div>
 
-            {/* Enhanced Hamburger Menu */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="focus:outline-none p-3 rounded-xl transition-all duration-300 group relative overflow-hidden"
@@ -630,7 +585,6 @@ const Navbar = () => {
               }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-amber-200/30 to-pink-200/30 transform scale-0 group-hover:scale-100 transition-transform duration-300 rounded-xl"></div>
-
               <div className="relative z-10">
                 {isMenuOpen ? (
                   <FaTimes className="h-5 w-5 text-red-500 transform rotate-0 group-hover:rotate-90 transition-transform duration-300" />
@@ -642,7 +596,6 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Enhanced Mobile Menu */}
         {isMenuOpen && (
           <div
             ref={mobileMenuRef}
@@ -665,14 +618,12 @@ const Navbar = () => {
                   data-aos-delay={50 * index}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-amber-100/50 to-pink-100/50 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-xl"></div>
-
                   <span className="text-xl group-hover:scale-110 transition-transform duration-300">
                     {link.icon}
                   </span>
                   <span className="text-amber-900 group-hover:text-amber-600 transition-colors duration-300 relative z-10">
                     {link.label}
                   </span>
-
                   <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <FaChevronDown className="h-3 w-3 text-amber-500 -rotate-90" />
                   </div>
@@ -682,7 +633,6 @@ const Navbar = () => {
           </div>
         )}
 
-        {/* Drag Handle - Chỉ hiển thị khi không ở đầu trang */}
         {!isAtTop && (
           <div
             ref={dragHandleRef}
