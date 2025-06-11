@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Thêm useNavigate
+import { sendOtp, verifyOtp, resetPassword } from "../api/apifogot";
 
 const ForgotPassword = () => {
   const [step, setStep] = useState(1);
@@ -10,9 +11,11 @@ const ForgotPassword = () => {
   const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false); // State cho modal
 
   const titleRef = useRef(null);
   const formRef = useRef(null);
+  const navigate = useNavigate(); // Hook để chuyển hướng
 
   // Karaoke text animation
   const animateKaraokeText = (element, text, delay = 0) => {
@@ -38,7 +41,7 @@ const ForgotPassword = () => {
 
       if (wordIndex < words.length - 1) {
         const space = document.createElement("span");
-        space.innerHTML = "&nbsp;";
+        space.innerHTML = " ";
         space.style.opacity = "0.3";
         wordSpan.appendChild(space);
       }
@@ -97,31 +100,7 @@ const ForgotPassword = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        "http://localhost:8082/user/forgot-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      if (!response.ok) {
-        let errorMessage = "Gửi OTP thất bại! Vui lòng kiểm tra email.";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          if (response.statusText === "Failed to fetch") {
-            errorMessage =
-              "Không thể kết nối đến server. Vui lòng kiểm tra backend.";
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
+      await sendOtp(email);
       setStep(2);
       setCountdown(60);
     } catch (err) {
@@ -142,28 +121,7 @@ const ForgotPassword = () => {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:8082/user/verify-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, otp }),
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Xác thực OTP thất bại! Vui lòng kiểm tra mã.";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          if (response.statusText === "Failed to fetch") {
-            errorMessage =
-              "Không thể kết nối đến server. Vui lòng kiểm tra backend.";
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
+      await verifyOtp(email, otp);
       setStep(3);
     } catch (err) {
       setError(err.message);
@@ -192,50 +150,18 @@ const ForgotPassword = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        "http://localhost:8082/user/reset-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email, otp, newPassword }),
-        }
-      );
+      await resetPassword(email, otp, newPassword);
+      setShowSuccessModal(true); // Hiển thị modal thành công
 
-      if (!response.ok) {
-        let errorMessage = "Đổi mật khẩu thất bại! Vui lòng thử lại.";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          if (response.statusText === "Failed to fetch") {
-            errorMessage =
-              "Không thể kết nối đến server. Vui lòng kiểm tra backend.";
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      const successMessage = document.createElement("div");
-      successMessage.innerHTML = `
-        <div class="text-center">
-          <div class="text-6xl mb-4">🎉</div>
-          <h3 class="text-2xl font-bold text-green-600 mb-2">Thành công!</h3>
-          <p class="text-gray-600">Mật khẩu của bạn đã được đổi thành công</p>
-        </div>
-      `;
-      successMessage.className =
-        "fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50";
-      document.body.appendChild(successMessage);
-
+      // Tự động đóng modal và chuyển hướng sau 3 giây
       setTimeout(() => {
-        document.body.removeChild(successMessage);
+        setShowSuccessModal(false);
         setStep(1);
         setEmail("");
         setOtp("");
         setNewPassword("");
         setConfirmPassword("");
+        navigate("/login"); // Chuyển hướng đến trang login
       }, 3000);
     } catch (err) {
       setError(err.message);
@@ -250,30 +176,7 @@ const ForgotPassword = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        "http://localhost:8082/user/forgot-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      if (!response.ok) {
-        let errorMessage = "Gửi lại OTP thất bại! Vui lòng thử lại.";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          if (response.statusText === "Failed to fetch") {
-            errorMessage =
-              "Không thể kết nối đến server. Vui lòng kiểm tra backend.";
-          }
-        }
-        throw new Error(errorMessage);
-      }
+      await sendOtp(email);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -283,6 +186,30 @@ const ForgotPassword = () => {
 
   return (
     <div className="min-h-screen mt-20 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12 px-4">
+      {/* Modal thông báo thành công */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl transform scale-100 transition-transform duration-300 animate-pulse-once">
+            <div className="text-center">
+              <div className="text-6xl mb-4 animate-bounce">🎉</div>
+              <h3 className="text-2xl font-bold text-green-600 mb-2">
+                Thành công!
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Mật khẩu của bạn đã được đổi thành công. Bạn sẽ được chuyển đến
+                trang đăng nhập...
+              </p>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full animate-progress"
+                  style={{ width: "100%", animationDuration: "3s" }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto">
         {/* Progress Bar */}
         <div className="mb-8">
