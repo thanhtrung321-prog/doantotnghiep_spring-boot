@@ -11,6 +11,7 @@ import SalonInfo from "../pages/Salon/Saloninfo";
 import About from "../pages/about/about";
 import Contact from "../pages/contact/Contact";
 import Profileuser from "../pages/profile/Profileuser";
+import Fogotpassword from "../pages/fogotpassword";
 
 // Import các Dashboard
 import CustomerDashboard from "../pages/Dashboard/CustomerDashboard";
@@ -50,6 +51,17 @@ const AppRoutes = () => {
           <>
             <Navbar />
             <ServiceList />
+            <Footer />
+          </>
+        }
+      />
+      {/* Trang fogotpassword */}
+      <Route
+        path="/fogotpassword"
+        element={
+          <>
+            <Navbar />
+            <Fogotpassword />
             <Footer />
           </>
         }
