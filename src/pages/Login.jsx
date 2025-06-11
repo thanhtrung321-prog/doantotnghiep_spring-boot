@@ -365,7 +365,7 @@ const Login = () => {
             Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
           </p>
           <p className="forgot-password-link">
-            Quên mật khẩu? <a href="/forgot-password">Lấy lại mật khẩu</a>
+            Quên mật khẩu? <a href="/fogotpassword">Lấy lại mật khẩu</a>
           </p>
           <p className="contact-support">
             Cần hỗ trợ? <a href="/contact">Liên hệ với chúng tôi</a>
