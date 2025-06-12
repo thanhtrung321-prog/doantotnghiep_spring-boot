@@ -81,6 +81,7 @@ const User = () => {
   const [viewMode, setViewMode] = useState("grid");
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
+  const [allUsers, setAllUsers] = useState([]); // Added for email validation
   const titleRef = useRef(null);
   const subtitleRef = useRef(null);
   const salonTitleRef = useRef(null);
@@ -108,6 +109,20 @@ const User = () => {
       }
     };
     fetchOwnerData();
+  }, []);
+
+  // Fetch all users for client-side email validation
+  useEffect(() => {
+    const fetchAllUsers = async () => {
+      try {
+        const users = await getAllUsers();
+        setAllUsers(users);
+      } catch (err) {
+        console.error("Lỗi khi lấy danh sách người dùng:", err);
+        toast.error("Không thể tải danh sách người dùng để kiểm tra email.");
+      }
+    };
+    fetchAllUsers();
   }, []);
 
   // Fetch staff and salon data
@@ -187,10 +202,29 @@ const User = () => {
     setShowPassword((prev) => !prev);
   }, []);
 
-  // Handle form submission
+  // Validate email for duplicates
+  const validateEmail = useCallback(
+    (email) => {
+      return allUsers.some(
+        (user) =>
+          user.email.toLowerCase() === email.toLowerCase() &&
+          user.id !== editingId
+      );
+    },
+    [allUsers, editingId]
+  );
+
+  // Handle form submission with improved error handling
   const handleSubmit = useCallback(
     async (e) => {
       e.preventDefault();
+
+      // Client-side email validation
+      if (!isEditing && validateEmail(formData.email)) {
+        toast.error("Email đã được sử dụng. Vui lòng chọn email khác.");
+        return;
+      }
+
       try {
         if (isEditing && editingId) {
           // Prepare update payload, use original data for unchanged fields
@@ -221,6 +255,7 @@ const User = () => {
           }
           const newUser = await createUser(formData);
           setStaff((prev) => [...prev, newUser]);
+          setAllUsers((prev) => [...prev, newUser]); // Update allUsers for validation
           toast.success("Thêm nhân viên thành công!");
         }
         setFormData({
@@ -230,7 +265,7 @@ const User = () => {
           phone: "",
           password: "",
           role: "STAFF",
-          salonId: salonId, // Use dynamic salonId
+          salonId: salonId,
         });
         setOriginalData(null);
         setIsEditing(false);
@@ -239,14 +274,25 @@ const User = () => {
         setShowPassword(false);
       } catch (err) {
         console.error("Lỗi khi lưu người dùng:", err);
-        toast.error(
-          `Không thể ${isEditing ? "cập nhật" : "thêm"} nhân viên: ${
-            err.response?.data?.message || err.message
-          }`
-        );
+        let errorMessage = `Không thể ${
+          isEditing ? "cập nhật" : "thêm"
+        } nhân viên.`;
+
+        // Handle specific server errors
+        if (err.response?.data?.message) {
+          if (err.response.data.message.toLowerCase().includes("email")) {
+            errorMessage = "Email đã được sử dụng. Vui lòng chọn email khác.";
+          } else {
+            errorMessage = err.response.data.message;
+          }
+        } else if (err.response?.status === 409) {
+          errorMessage = "Email đã tồn tại trong hệ thống.";
+        }
+
+        toast.error(errorMessage);
       }
     },
-    [isEditing, editingId, formData, originalData, salonId]
+    [isEditing, editingId, formData, originalData, salonId, validateEmail]
   );
 
   // Handle edit
@@ -261,10 +307,10 @@ const User = () => {
         email: userData.email,
         phone: userData.phone,
         password: "", // Password not pre-filled for security
-        role: "STAFF", // Hardcode role
+        role: "STAFF",
         salonId: userData.salonId,
       });
-      setOriginalData(userData); // Store original data for unchanged fields
+      setOriginalData(userData);
       setShowDetails(null);
       setShowFormModal(true);
       setShowPassword(false);
@@ -285,6 +331,7 @@ const User = () => {
     try {
       await deleteUser(deleteId);
       setStaff((prev) => prev.filter((user) => user.id !== deleteId));
+      setAllUsers((prev) => prev.filter((user) => user.id !== deleteId)); // Update allUsers
       toast.success("Xóa nhân viên thành công!");
       setShowModal(false);
       setDeleteId(null);

@@ -1,10 +1,10 @@
 import axios from "axios";
 
-// Base URL của API
+// Base URLs của API
 const API_URL = "http://localhost:8082/user";
 const SALON_API_URL = "http://localhost:8084/salon";
 
-// Helper function to get token
+// Helper function to get auth header
 const getAuthHeader = () => {
   const token = localStorage.getItem("token");
   if (!token) {
@@ -67,7 +67,7 @@ export const createUser = async (userData) => {
         email: userData.email,
         phone: userData.phone,
         password: userData.password,
-        role: userData.role, // Use role from userData
+        role: "STAFF", // Hardcode role to STAFF
         salonId: userData.salonId,
       },
       {
@@ -100,10 +100,9 @@ export const updateUser = async (id, userData) => {
       username: userData.username,
       email: userData.email,
       phone: userData.phone,
-      role: userData.role, // Use role from userData
+      role: "STAFF", // Hardcode role to STAFF
       salonId: userData.salonId,
     };
-    // Only include password if provided and non-empty
     if (userData.password && userData.password.trim() !== "") {
       updatePayload.password = userData.password;
     }
@@ -129,7 +128,7 @@ export const updateUser = async (id, userData) => {
   }
 };
 
-// Xoá người dùng theo ID
+// Xóa người dùng theo ID
 export const deleteUser = async (id) => {
   try {
     const response = await axios.delete(`${API_URL}/${id}`, {
@@ -137,7 +136,7 @@ export const deleteUser = async (id) => {
     });
     return response.data;
   } catch (error) {
-    console.error("Lỗi khi xoá người dùng:", error);
+    console.error("Lỗi khi xóa người dùng:", error);
     if (
       error.response &&
       (error.response.status === 401 || error.response.status === 403)
@@ -145,7 +144,7 @@ export const deleteUser = async (id) => {
       throw new Error("401: Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
     }
     throw new Error(
-      error.response?.data?.message || "Không thể xoá người dùng."
+      error.response?.data?.message || "Không thể xóa người dùng."
     );
   }
 };
