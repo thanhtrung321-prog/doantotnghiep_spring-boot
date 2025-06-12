@@ -27,7 +27,6 @@ export const updateUser = async (userId, updatedFields, token) => {
   }
 
   try {
-    // Validate optional fields
     if (
       updatedFields.email &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updatedFields.email)
@@ -43,13 +42,12 @@ export const updateUser = async (userId, updatedFields, token) => {
       throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự");
     }
 
-    // Map newPassword to password for backend compatibility
     const payload = {
       ...updatedFields,
       password: updatedFields.newPassword || updatedFields.password,
     };
     delete payload.newPassword;
-    delete payload.oldPassword; // Remove oldPassword as backend doesn't use it
+    delete payload.oldPassword;
 
     const response = await axios.put(
       `${API_BASE_URL}:8082/user/${userId}`,
@@ -153,9 +151,27 @@ export const fetchService = async (serviceId) => {
 
 export const updateBookingStatus = async (bookingId, status, token) => {
   try {
-    const response = await axios.patch(
-      `${API_BASE_URL}:8087/booking/${bookingId}/status`,
-      { status },
+    let endpoint;
+    switch (status.toUpperCase()) {
+      case "CANCELLED":
+        endpoint = `${API_BASE_URL}:8087/booking/${bookingId}/status/cancel`;
+        break;
+      case "COMPLETED":
+        endpoint = `${API_BASE_URL}:8087/booking/${bookingId}/status/complete`;
+        break;
+      case "CONFIRMED":
+        endpoint = `${API_BASE_URL}:8087/booking/${bookingId}/status/confirm`;
+        break;
+      case "PENDING":
+        endpoint = `${API_BASE_URL}:8087/booking/${bookingId}/status/pending`;
+        break;
+      default:
+        throw new Error(`Trạng thái không hợp lệ: ${status}`);
+    }
+
+    const response = await axios.put(
+      endpoint,
+      {}, // No body needed as per backend API
       {
         headers: {
           Authorization: `Bearer ${token}`,
