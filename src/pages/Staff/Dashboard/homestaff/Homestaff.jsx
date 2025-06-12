@@ -517,9 +517,9 @@ const Homestaff = () => {
     if (showConfirmModal && confirmTextRef.current) {
       animateText(
         confirmTextRef,
-        `Xác nhận cập nhật trạng thái thành\n"${getStatusDisplay(
+        `Xác nhận cập nhật trạng thái thành "${getStatusDisplay(
           showConfirmModal.newStatus
-        )}"?`
+        )}" ?`
       );
     }
   }, [showActionModal, showConfirmModal]);
@@ -1060,7 +1060,7 @@ const Homestaff = () => {
             ref={modalRef}
             className={`
               bg-gradient-to-br from-gray-800 to-indigo-900 rounded-2xl
-              p-6 md:p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto
+              p-6 md:p-8 w-full max-w-[80%] max-h-[90vh] overflow-y-auto
               shadow-2xl border-2 border-cyan-500
             `}
           >
@@ -1079,16 +1079,17 @@ const Homestaff = () => {
               text-2xl md:text-3xl font-extrabold text-center
               bg-clip-text text-transparent
               bg-gradient-to-r from-cyan-400 to-pink-500 mb-6 leading-relaxed
+              max-w-3xl mx-auto whitespace-normal
             `}
             >
               Chi Tiết Dịch Vụ
             </h2>
             <div className="text-center mb-8 space-y-4">
-              <p className="text-base md:text-lg text-white leading-relaxed">
+              <p className="text-base md:text-lg text-white leading-relaxed max-w-2xl mx-auto">
                 <strong className="text-cyan-400">Khách hàng:</strong>{" "}
                 {showDetails.customerName}
               </p>
-              <p className="text-base md:text-lg text-white leading-relaxed">
+              <p className="text-base md:text-lg text-white leading-relaxed max-w-2xl mx-auto">
                 <strong className="text-cyan-400">Thời gian:</strong>{" "}
                 {moment(showDetails.startTime).format("D MMMM, YYYY, h:mm A")} -{" "}
                 {moment(showDetails.endTime).format("h:mm A")}
@@ -1098,7 +1099,7 @@ const Homestaff = () => {
               const steps = parseSteps(service);
               return (
                 <div key={index} className="mb-8">
-                  <h3 className="text-lg md:text-xl font-bold text-cyan-300 mb-4 leading-relaxed">
+                  <h3 className="text-lg md:text-xl font-bold text-cyan-300 mb-4 leading-relaxed max-w-2xl mx-auto">
                     Dịch Vụ: {service.name.split("|")[0]}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1165,15 +1166,15 @@ const Homestaff = () => {
             ref={modalRef}
             className={`
               bg-gradient-to-br from-gray-800 to-indigo-900 rounded-2xl
-              p-6 w-full max-w-md shadow-2xl
-              border-2 border-cyan-500 relative overflow-hidden
+              p-6 w-full max-w-[80%] shadow-2xl border-2 border-cyan-500
+              relative overflow-hidden
             `}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-pink-500/10 opacity-50"></div>
             <button
               className={`
                 absolute top-3 right-3 text-gray-300 hover:text-white
-                text-2xl md:text-3xl transition-colors duration-200
+                text-2xl font-bold transition-colors duration-200
               `}
               onClick={() => setShowActionModal(null)}
               data-testid="action-close"
@@ -1184,58 +1185,54 @@ const Homestaff = () => {
             </button>
             <h3
               ref={actionTextRef}
-              className="text-xl md:text-2xl font-bold text-center text-white mb-5 leading-relaxed"
+              className="text-2xl font-bold text-center text-white mb-6 leading-relaxed tracking-wide max-w-md mx-auto"
               data-aos="fade-up"
               data-aos-delay="200"
             >
               Chọn Hành Động
             </h3>
-            <div className="space-y-4">
-              {getStatusOptions(showActionModal.currentStatus).map((option) => (
-                <button
-                  key={option.value}
-                  className={`
-                    w-full px-4 py-2.5 text-white rounded-lg
-                    font-medium text-sm md:text-base
+            <div className="grid grid-cols-1 gap-4">
+              {getStatusOptions(showActionModal.currentStatus).map(
+                (option, index) => (
+                  <button
+                    key={option.value}
+                    className={`
+                    w-full px-4 py-3 text-white rounded-lg font-medium text-sm
                     transition-all duration-300 transform hover:scale-105
                     shadow-sm hover:shadow-md
                     ${
                       option.disabled
                         ? "bg-gray-600 opacity-50 cursor-not-allowed"
-                        : `
-                          bg-gradient-to-r from-cyan-600 to-blue-600
-                          hover:from-cyan-700 hover:to-blue-700
-                        `
+                        : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
                     }
                   `}
-                  onClick={() =>
-                    !option.disabled &&
-                    handleOpenConfirmModal(
-                      showActionModal.bookingId,
-                      option.value
-                    )
-                  }
-                  disabled={option.disabled}
-                  data-testid={`action-option-${option.value}`}
-                  data-aos="fade-up"
-                  data-aos-delay="300"
-                >
-                  {option.label}
-                </button>
-              ))}
+                    onClick={() =>
+                      !option.disabled &&
+                      handleOpenConfirmModal(
+                        showActionModal.bookingId,
+                        option.value
+                      )
+                    }
+                    disabled={option.disabled}
+                    data-testid={`action-option-${option.value}`}
+                    data-aos="fade-up"
+                    data-aos-delay={`${300 + index * 100}`}
+                  >
+                    {option.label}
+                  </button>
+                )
+              )}
             </div>
             <button
               className={`
-                mt-5 w-full px-4 py-2.5
-                bg-gray-700 text-gray-300 hover:bg-gray-600
-                rounded-lg font-medium text-sm md:text-base
-                transition-colors duration-300
+                mt-6 w-full px-4 py-3 bg-gray-700 text-gray-300 hover:bg-gray-600
+                rounded-lg font-medium text-sm transition-colors duration-300
                 shadow-sm hover:shadow-md
               `}
               onClick={() => setShowActionModal(null)}
               data-testid="action-cancel"
               data-aos="fade-up"
-              data-aos-delay="400"
+              data-aos-delay="500"
             >
               Hủy
             </button>
@@ -1253,15 +1250,15 @@ const Homestaff = () => {
             ref={modalRef}
             className={`
               bg-gradient-to-br from-gray-800 to-indigo-900 rounded-2xl
-              p-6 w-full max-w-md shadow-2xl
-              border-2 border-cyan-500 relative overflow-hidden
+              p-6 w-full max-w-[80%] shadow-2xl border-2 border-cyan-500
+              relative overflow-hidden
             `}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-pink-500/10 opacity-50"></div>
             <button
               className={`
                 absolute top-3 right-3 text-gray-300 hover:text-white
-                text-2xl md:text-3xl transition-colors duration-200
+                text-2xl font-bold transition-colors duration-200
               `}
               onClick={() => setShowConfirmModal(null)}
               data-testid="confirm-close"
@@ -1272,23 +1269,25 @@ const Homestaff = () => {
             </button>
             <h3
               ref={confirmTextRef}
-              className="text-xl md:text-2xl font-bold text-center text-white mb-5 leading-relaxed whitespace-pre-line"
+              className="text-2xl font-bold text-center text-white mb-6 leading-relaxed tracking-wide max-w-md mx-auto"
               data-aos="fade-up"
               data-aos-delay="200"
             >
-              Xác nhận cập nhật trạng thái thành{"\n"}
-              <span className={getStatusTextColor(showConfirmModal.newStatus)}>
-                "{getStatusDisplay(showConfirmModal.newStatus)}"?
+              Xác nhận cập nhật trạng thái thành{" "}
+              <span
+                className={`inline-block text-3xl mt-2 ${getStatusTextColor(
+                  showConfirmModal.newStatus
+                )}`}
+              >
+                "{getStatusDisplay(showConfirmModal.newStatus)}" ?
               </span>
             </h3>
-            <div className="flex justify-center gap-4 mt-6">
+            <div className="grid grid-cols-2 gap-4 mt-6">
               <button
                 className={`
-                  px-6 py-2.5
-                  bg-gradient-to-r from-cyan-600 to-blue-600
-                  hover:from-cyan-700 hover:to-blue-700
-                  text-white rounded-lg font-medium text-sm md:text-base
-                  transition-all duration-300 transform hover:scale-105
+                  px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600
+                  hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg
+                  font-medium text-sm transition-all duration-300 transform hover:scale-105
                   shadow-sm hover:shadow-md
                 `}
                 onClick={() =>
@@ -1305,10 +1304,8 @@ const Homestaff = () => {
               </button>
               <button
                 className={`
-                  px-6 py-2.5
-                  bg-gray-700 text-gray-300 hover:bg-gray-600
-                  rounded-lg font-medium text-sm md:text-base
-                  transition-colors duration-300
+                  px-4 py-3 bg-gray-700 text-gray-300 hover:bg-gray-600
+                  rounded-lg font-medium text-sm transition-colors duration-300
                   shadow-sm hover:shadow-md
                 `}
                 onClick={() => setShowConfirmModal(null)}
@@ -1409,6 +1406,7 @@ const Homestaff = () => {
         }
         .char {
           display: inline-block;
+          margin-right: 2px;
         }
         .animation-delay-150 {
           animation-delay: 150ms;
