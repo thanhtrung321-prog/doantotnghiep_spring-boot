@@ -23,6 +23,7 @@ import OwnerDasboard from "../pages/Dashboard/OwnerDasboard";
 import Hairtrend from "../pages/collection/Hairtrend";
 import BeforeAfterSlider from "../pages/collection/Beforeafterslider";
 import VideoSalon from "../pages/collection/videosalon";
+import Appointments from "../pages/appointments/Appointments";
 // import Profile from "../pages/admin/Dashboard/homeadmin/Profile";
 
 // Component ProtectedRoute để bảo vệ các route dựa trên vai trò
@@ -87,7 +88,7 @@ const AppRoutes = () => {
         path="/about"
         element={
           <>
-            <Header />
+            {/* <Header /> */}
             <Navbar />
             <About />
             <SalonInfo />
@@ -101,7 +102,7 @@ const AppRoutes = () => {
         path="/tableprice"
         element={
           <>
-            <Header />
+            {/* <Header /> */}
             <Navbar />
             <TablePrice />
             <Footer />
@@ -113,7 +114,7 @@ const AppRoutes = () => {
         path="/booking"
         element={
           <>
-            <Header />
+            {/* <Header /> */}
             <Navbar />
             <BookingPage />
             <Footer />
@@ -126,7 +127,7 @@ const AppRoutes = () => {
         path="/contact"
         element={
           <>
-            <Header />
+            {/* <Header /> */}
             <Navbar />
             <Contact />
             <Footer />
@@ -134,6 +135,18 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Trang lịch sử lịch hẹn*/}
+      <Route
+        path="/appointments"
+        element={
+          <>
+            {/* <Header /> */}
+            <Navbar />
+            <Appointments />
+            <Footer />
+          </>
+        }
+      />
       {/* Trang Profile - Bảo vệ cho USER, STAFF, ADMIN */}
       <Route
         path="/profile"
