@@ -24,6 +24,7 @@ import Hairtrend from "../pages/collection/Hairtrend";
 import BeforeAfterSlider from "../pages/collection/Beforeafterslider";
 import VideoSalon from "../pages/collection/videosalon";
 import Appointments from "../pages/appointments/Appointments";
+import Chatbot from "../pages/chatbot/chatbot";
 // import Profile from "../pages/admin/Dashboard/homeadmin/Profile";
 
 // Component ProtectedRoute để bảo vệ các route dựa trên vai trò
@@ -143,6 +144,18 @@ const AppRoutes = () => {
             {/* <Header /> */}
             <Navbar />
             <Appointments />
+            <Footer />
+          </>
+        }
+      />
+      {/* Trang chat bot*/}
+      <Route
+        path="/chatbot"
+        element={
+          <>
+            {/* <Header /> */}
+            <Navbar />
+            <Chatbot />
             <Footer />
           </>
         }

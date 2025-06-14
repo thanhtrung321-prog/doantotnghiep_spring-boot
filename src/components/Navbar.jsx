@@ -437,6 +437,14 @@ const Navbar = () => {
                 📅 Lịch Sử Lịch Hẹn
               </span>
             </Link>
+            <Link
+              to="/chatbot"
+              className="group flex items-center px-5 py-3 text-amber-900 hover:text-amber-600 transition-all duration-300 relative overflow-hidden"
+              onClick={() => setIsUserMenuOpen(false)}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-100/50 to-pink-100/50 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+              <span className="relative z-10 font-medium">🤖 Chatbot</span>
+            </Link>
             <button
               className="group flex items-center w-full px-5 py-3 text-red-600 hover:text-red-700 transition-all duration-300 relative overflow-hidden"
               onClick={handleLogout}
