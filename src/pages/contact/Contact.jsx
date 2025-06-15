@@ -1,21 +1,105 @@
-import React from "react";
+import React, { useState } from "react";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { submitContactForm } from "../../api/contact";
 
 const Contact = () => {
+  const [formData, setFormData] = useState({
+    fullName: "",
+    phoneNumber: "",
+    email: "",
+    message: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const RGBGradientText = ({ text, className = "", direction = "right" }) => {
+    const gradientDirection =
+      direction === "left"
+        ? "bg-gradient-to-l"
+        : direction === "right"
+        ? "bg-gradient-to-r"
+        : direction === "top"
+        ? "bg-gradient-to-t"
+        : direction === "bottom"
+        ? "bg-gradient-to-b"
+        : "bg-gradient-to-r";
+    return (
+      <span
+        className={`${gradientDirection} from-cyan-400 via-pink-400 to-yellow-400 bg-clip-text text-transparent ${className}`}
+      >
+        {text}
+      </span>
+    );
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      await submitContactForm(formData);
+      toast.success("Tin nhắn đã được gửi thành công!");
+      setFormData({
+        fullName: "",
+        phoneNumber: "",
+        email: "",
+        message: "",
+      });
+    } catch (error) {
+      toast.error(`Lỗi khi gửi tin nhắn: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="bg-stone-50 min-h-screen py-16">
+    <div className="bg-gradient-to-b from-gray-50 to-gray-200 min-h-screen py-36">
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
       <div className="container mx-auto px-4">
+        /* Header */
+        <div className="text-center mb-12">
+          <RGBGradientText
+            text="Beauty Salon"
+            className="text-5xl font-extrabold mb-2 block"
+            direction="right"
+          />
+          <RGBGradientText
+            text="Kết nối để nhận tư vấn tốt nhất"
+            className="text-cyan-200 text-lg font-semibold block"
+            direction="left"
+          />
+          <div className="w-32 h-1 bg-gradient-to-r from-cyan-500 to-pink-500 mx-auto mt-4"></div>
+        </div>
         {/* Contact Info & Form */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
           {/* Contact Information */}
-          <div className="bg-white p-8 rounded-lg shadow-lg">
-            <h3 className="text-3xl font-bold text-amber-800 mb-6">
-              Thông Tin Liên Hệ
-            </h3>
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
+            <RGBGradientText
+              text="Thông Tin Liên Hệ"
+              className="text-3xl font-bold mb-6"
+              direction="left"
+            />
             <div className="space-y-6">
               <div className="flex items-start">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-4 mt-1"
+                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -43,7 +127,7 @@ const Contact = () => {
               <div className="flex items-start">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-4 mt-1"
+                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -65,7 +149,7 @@ const Contact = () => {
               <div className="flex items-start">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-4 mt-1"
+                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -85,7 +169,7 @@ const Contact = () => {
               <div className="flex items-start">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-amber-600 mr-4 mt-1"
+                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -108,13 +192,13 @@ const Contact = () => {
             </div>
 
             {/* Social Media */}
-            <h4 className="text-lg font-semibold text-amber-800 mt-6 mb-4">
+            <h4 className="text-lg font-semibold text-amber-800 mt-8 mb-4">
               Kết Nối Với Chúng Tôi
             </h4>
             <div className="flex space-x-4">
               <a
-                href="#"
-                className="w-12 h-12 rounded-full bg-amber-600 flex items-center justify-center text-white hover:bg-amber-700 transition"
+                href="https://facebook.com"
+                className="w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-pink-500 flex items-center justify-center text-white hover:from-cyan-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-110 shadow-md"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -127,8 +211,8 @@ const Contact = () => {
                 </svg>
               </a>
               <a
-                href="#"
-                className="w-12 h-12 rounded-full bg-amber-600 flex items-center justify-center text-white hover:bg-amber-700 transition"
+                href="https://instagram.com"
+                className="w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-pink-500 flex items-center justify-center text-white hover:from-cyan-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-110 shadow-md"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -141,8 +225,8 @@ const Contact = () => {
                 </svg>
               </a>
               <a
-                href="#"
-                className="w-12 h-12 rounded-full bg-amber-600 flex items-center justify-center text-white hover:bg-amber-700 transition"
+                href="https://youtube.com"
+                className="w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-pink-500 flex items-center justify-center text-white hover:from-cyan-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-110 shadow-md"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -158,18 +242,23 @@ const Contact = () => {
           </div>
 
           {/* Contact Form */}
-          <div className="bg-amber-50 p-8 rounded-lg shadow-lg">
-            <h3 className="text-3xl font-bold text-amber-800 mb-6">
-              Gửi Tin Nhắn Cho Chúng Tôi
-            </h3>
-            <form className="space-y-6">
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
+            <RGBGradientText
+              text="Gửi Tin Nhắn Cho Chúng Tôi"
+              className="text-3xl font-bold mb-6"
+              direction="right"
+            />
+            <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label className="block text-gray-700 font-medium mb-2">
                   Họ Tên
                 </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-cyan-300 transition-all duration-300"
                   placeholder="Nhập họ tên của bạn"
                   required
                 />
@@ -180,7 +269,10 @@ const Contact = () => {
                 </label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-cyan-300 transition-all duration-300"
                   placeholder="Nhập số điện thoại"
                   required
                 />
@@ -191,7 +283,10 @@ const Contact = () => {
                 </label>
                 <input
                   type="email"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-cyan-300 transition-all duration-300"
                   placeholder="Nhập email của bạn"
                   required
                 />
@@ -201,7 +296,10 @@ const Contact = () => {
                   Tin Nhắn
                 </label>
                 <textarea
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  name="message"
+                  value={formData.message}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-cyan-300 transition-all duration-300"
                   rows="5"
                   placeholder="Nhập tin nhắn hoặc yêu cầu của bạn"
                   required
@@ -209,20 +307,26 @@ const Contact = () => {
               </div>
               <button
                 type="submit"
-                className="w-full bg-amber-600 text-white py-3 px-4 rounded-md hover:bg-amber-700 transition font-medium"
+                disabled={isSubmitting}
+                className={`w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-pink-500 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-md ${
+                  isSubmitting
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:from-cyan-600 hover:to-pink-600"
+                }`}
               >
-                Gửi Tin Nhắn
+                {isSubmitting ? "Đang Gửi..." : "Gửi Tin Nhắn"}
               </button>
             </form>
           </div>
         </div>
-
         {/* Map Section */}
-        <div className="bg-amber-800 py-16 rounded-lg">
-          <h3 className="text-3xl font-bold text-white text-center mb-8">
-            Tìm Đến Chúng Tôi
-          </h3>
-          <div className="w-full h-96 rounded-lg overflow-hidden shadow-lg">
+        <div className="bg-gradient-to-r from-cyan-900 to-gray-900 py-16 rounded-2xl shadow-xl">
+          <RGBGradientText
+            text="Tìm Đến Chúng Tôi"
+            className="text-3xl font-bold text-center text-white mb-8"
+            direction="left"
+          />
+          <div className="w-full h-96 rounded-xl overflow-hidden shadow-lg border-2 border-cyan-300">
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.6696841868067!2d106.69058931474887!3d10.759917192321414!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31752f1c06f4e1dd%3A0x43900e8a06a977dc!2s236%20Nguy%E1%BB%85n%20Tr%C3%A3i%2C%20Ph%C6%B0%E1%BB%9Dng%20Nguy%E1%BB%85n%20C%C6%B0%20Trinh%2C%20Qu%E1%BA%ADn%201%2C%20Th%C3%A0nh%20ph%E1%BB%91%20H%E1%BB%93%20Ch%C3%AD%20Minh%2C%20Vietnam!5e0!3m2!1sen!2s!4v1698765432100!5m2!1sen!2s"
               width="100%"
