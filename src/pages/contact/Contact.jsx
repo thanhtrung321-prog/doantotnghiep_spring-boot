@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Slider from "react-slick";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 import { submitContactForm } from "../../api/contact";
 
 const Contact = () => {
@@ -9,12 +12,133 @@ const Contact = () => {
     phoneNumber: "",
     email: "",
     message: "",
+    salonId: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [salons, setSalons] = useState([]);
+  const [selectedSalon, setSelectedSalon] = useState(null);
+  const [submissionCount, setSubmissionCount] = useState({});
+  const [lockoutTime, setLockoutTime] = useState(0);
+  const lockoutTimerRef = useRef(null);
+
+  // Fetch salons
+  useEffect(() => {
+    const fetchSalons = async () => {
+      try {
+        const response = await fetch("http://localhost:8084/salon");
+        if (!response.ok) throw new Error("Không thể tải danh sách salon");
+        const data = await response.json();
+        setSalons(data);
+        if (data.length > 0) {
+          setFormData((prev) => ({ ...prev, salonId: data[0].id }));
+          setSelectedSalon(data[0]);
+        }
+      } catch (error) {
+        toast.error("Lỗi khi tải danh sách salon: " + error.message);
+      }
+    };
+    fetchSalons();
+  }, []);
+
+  // Handle lockout countdown
+  useEffect(() => {
+    if (lockoutTime > 0) {
+      lockoutTimerRef.current = setInterval(() => {
+        setLockoutTime((prev) => {
+          if (prev <= 1) {
+            clearInterval(lockoutTimerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(lockoutTimerRef.current);
+  }, [lockoutTime]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "salonId") {
+      const salon = salons.find((s) => s.id === parseInt(value));
+      setSelectedSalon(salon);
+    }
+  };
+
+  // Input validation
+  const validateForm = () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10,11}$/;
+    const profanityList = [
+      "fuck",
+      "shit",
+      "damn",
+      "asshole",
+      "bitch",
+      // Add more as needed
+    ];
+
+    if (!emailRegex.test(formData.email)) {
+      toast.error("Vui lòng nhập email hợp lệ");
+      return false;
+    }
+
+    if (!phoneRegex.test(formData.phoneNumber)) {
+      toast.error("Số điện thoại phải có 10-11 chữ số");
+      return false;
+    }
+
+    const messageLower = formData.message.toLowerCase();
+    if (profanityList.some((word) => messageLower.includes(word))) {
+      toast.error("Tin nhắn chứa từ ngữ không phù hợp");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) return;
+
+    // Check submission limit
+    const email = formData.email;
+    const currentCount = submissionCount[email] || 0;
+    if (currentCount >= 3 && lockoutTime === 0) {
+      setLockoutTime(30);
+      setSubmissionCount((prev) => ({ ...prev, [email]: 0 }));
+      toast.warn("Bạn đã gửi quá 3 tin nhắn. Vui lòng đợi 30 giây.");
+      return;
+    }
+
+    if (lockoutTime > 0) {
+      toast.warn(`Vui lòng đợi ${lockoutTime} giây trước khi gửi lại`);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await submitContactForm(formData);
+      toast.success("Tin nhắn đã được gửi thành công!");
+      setFormData({
+        fullName: "",
+        phoneNumber: "",
+        email: "",
+        message: "",
+        salonId: salons[0]?.id || "",
+      });
+      setSelectedSalon(salons[0]);
+      setSubmissionCount((prev) => ({
+        ...prev,
+        [email]: (prev[email] || 0) + 1,
+      }));
+    } catch (error) {
+      toast.error(`Lỗi khi gửi tin nhắn: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const RGBGradientText = ({ text, className = "", direction = "right" }) => {
@@ -37,28 +161,21 @@ const Contact = () => {
     );
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      await submitContactForm(formData);
-      toast.success("Tin nhắn đã được gửi thành công!");
-      setFormData({
-        fullName: "",
-        phoneNumber: "",
-        email: "",
-        message: "",
-      });
-    } catch (error) {
-      toast.error(`Lỗi khi gửi tin nhắn: ${error.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+  // Slider settings
+  const sliderSettings = {
+    dots: true,
+    infinite: true,
+    speed: 500,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    autoplay: true,
+    autoplaySpeed: 3000,
+    arrows: true,
+    adaptiveHeight: true,
   };
 
   return (
-    <div className="bg-gradient-to-b from-gray-50 to-gray-200 min-h-screen py-36">
+    <div className="bg-gradient-to-b from-gray-50 to-gray-200 min-h-screen py-42">
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -94,102 +211,144 @@ const Contact = () => {
               className="text-3xl font-bold mb-6"
               direction="left"
             />
-            <div className="space-y-6">
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                <div>
-                  <h4 className="font-semibold text-amber-800">Địa Chỉ</h4>
-                  <p className="text-gray-600">
-                    236 Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                  />
-                </svg>
-                <div>
-                  <h4 className="font-semibold text-amber-800">
-                    Số Điện Thoại
-                  </h4>
-                  <p className="text-gray-600">0912 345 678</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                <div>
-                  <h4 className="font-semibold text-amber-800">Email</h4>
-                  <p className="text-gray-600">info@maitocdep.vn</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 text-cyan-500 mr-4 mt-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div>
-                  <h4 className="font-semibold text-amber-800">Giờ Mở Cửa</h4>
-                  <p className="text-gray-600">Thứ 2 - Thứ 6: 9:00 - 20:00</p>
-                  <p className="text-gray-600">
-                    Thứ 7 - Chủ Nhật: 9:00 - 21:00
-                  </p>
-                </div>
-              </div>
+            <div className="mb-6">
+              <label className="block text-gray-700 font-medium mb-2">
+                Chọn Salon
+              </label>
+              <select
+                name="salonId"
+                value={formData.salonId}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-cyan-300 transition-all duration-300"
+              >
+                {salons.map((salon) => (
+                  <option key={salon.id} value={salon.id}>
+                    {salon.name}
+                  </option>
+                ))}
+              </select>
             </div>
-
+            {selectedSalon && (
+              <>
+                <div className="space-y-6">
+                  <div className="flex items-start">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6 text-cyan-500 mr-4 mt-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    <div>
+                      <h4 className="font-semibold text-amber-800">Địa Chỉ</h4>
+                      <p className="text-gray-600">
+                        {selectedSalon.address}, {selectedSalon.city}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6 text-cyan-500 mr-4 mt-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                      />
+                    </svg>
+                    <div>
+                      <h4 className="font-semibold text-amber-800">
+                        Số Điện Thoại
+                      </h4>
+                      <p className="text-gray-600">{selectedSalon.contact}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6 text-cyan-500 mr-4 mt-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <div>
+                      <h4 className="font-semibold text-amber-800">Email</h4>
+                      <p className="text-gray-600">{selectedSalon.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6 text-cyan-500 mr-4 mt-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <h4 className="font-semibold text-amber-800">
+                        Giờ Mở Cửa
+                      </h4>
+                      <p className="text-gray-600">
+                        {selectedSalon.openingTime} -{" "}
+                        {selectedSalon.closingTime}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {selectedSalon.images && selectedSalon.images.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="font-semibold text-amber-800 mb-4">
+                      Hình Ảnh Salon
+                    </h4>
+                    <Slider {...sliderSettings}>
+                      {selectedSalon.images.map((image, index) => (
+                        <div key={index}>
+                          <img
+                            src={`http://localhost:8084/salon-images/${image}`}
+                            alt={`Salon ${selectedSalon.name} image ${
+                              index + 1
+                            }`}
+                            className="w-full h-64 object-cover rounded-lg shadow-md"
+                          />
+                        </div>
+                      ))}
+                    </Slider>
+                  </div>
+                )}
+              </>
+            )}
             {/* Social Media */}
             <h4 className="text-lg font-semibold text-amber-800 mt-8 mb-4">
               Kết Nối Với Chúng Tôi
@@ -306,14 +465,18 @@ const Contact = () => {
               </div>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || lockoutTime > 0}
                 className={`w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-pink-500 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-md ${
-                  isSubmitting
+                  isSubmitting || lockoutTime > 0
                     ? "opacity-50 cursor-not-allowed"
                     : "hover:from-cyan-600 hover:to-pink-600"
                 }`}
               >
-                {isSubmitting ? "Đang Gửi..." : "Gửi Tin Nhắn"}
+                {isSubmitting
+                  ? "Đang Gửi..."
+                  : lockoutTime > 0
+                  ? `Đợi ${lockoutTime}s`
+                  : "Gửi Tin Nhắn"}
               </button>
             </form>
           </div>
