@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { gsap } from "gsap";
+import AOS from "aos";
+import "aos/dist/aos.css";
 import {
   Home,
   Calendar,
   Grid3x3,
   CreditCard,
-  Store,
   Scissors,
   Users,
   Menu,
@@ -18,8 +19,15 @@ import {
   User,
   Info,
   Edit2,
+  Phone,
+  Mail,
+  Clock,
+  Trash2,
 } from "lucide-react";
 import { FaTimes, FaLock, FaCheckCircle } from "react-icons/fa";
+import useSound from "use-sound";
+import { fetchNotifications } from "../api/nofication";
+import notificationSound from "../asset/musicnofication/nofication.mp3";
 
 const Headerowner = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -29,7 +37,13 @@ const Headerowner = () => {
   const [showSalonModal, setShowSalonModal] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isDeleteSuccessModalOpen, setIsDeleteSuccessModalOpen] =
+    useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [notifications, setNotifications] = useState([]);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState(null);
   const [editForm, setEditForm] = useState({
     fullName: "",
     email: "",
@@ -42,13 +56,22 @@ const Headerowner = () => {
   const logoRef = useRef(null);
   const editModalRef = useRef(null);
   const successModalRef = useRef(null);
+  const deleteSuccessModalRef = useRef(null);
+  const allNotificationsModalRef = useRef(null);
+  const deleteConfirmModalRef = useRef(null);
   const navigate = useNavigate();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [playSound] = useSound(notificationSound, { volume: 0.5 });
+  const prevNotificationIds = useRef(new Set());
 
   useEffect(() => {
     // Initialize Lucide icons
     if (typeof window !== "undefined" && window.lucide) {
       window.lucide.createIcons();
     }
+
+    // Initialize AOS
+    AOS.init({ duration: 1000, once: true });
 
     // GSAP animations for header
     if (typeof window !== "undefined" && window.gsap) {
@@ -78,7 +101,7 @@ const Headerowner = () => {
       );
     }
 
-    // Fetch user and salon data
+    // Fetch user, salon data, and notifications
     const fetchData = async () => {
       const userId = localStorage.getItem("userId");
       const token = localStorage.getItem("token");
@@ -130,6 +153,20 @@ const Headerowner = () => {
           }
           setSalonData(salonResponse.data);
         }
+
+        // Fetch notifications
+        const notificationData = await fetchNotifications();
+        const currentIds = new Set(notificationData.map((n) => n.id));
+        const hasNewNotifications = [...currentIds].some(
+          (id) => !prevNotificationIds.current.has(id)
+        );
+
+        if (hasNewNotifications) {
+          playSound(); // Play sound only for new notifications
+        }
+
+        setNotifications(notificationData);
+        prevNotificationIds.current = currentIds;
       } catch (error) {
         console.error("Error fetching data:", error);
         if (
@@ -146,7 +183,13 @@ const Headerowner = () => {
     };
 
     fetchData();
-  }, [navigate]);
+
+    // Set up interval to fetch data every 10 seconds
+    const intervalId = setInterval(fetchData, 10000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [navigate, playSound]);
 
   // GSAP animations for modals
   useEffect(() => {
@@ -179,7 +222,63 @@ const Headerowner = () => {
 
     animateModal(editModalRef, isEditModalOpen, "edit-modal-backdrop");
     animateModal(successModalRef, isSuccessModalOpen, "success-modal-backdrop");
-  }, [isEditModalOpen, isSuccessModalOpen]);
+    animateModal(
+      deleteSuccessModalRef,
+      isDeleteSuccessModalOpen,
+      "delete-success-modal-backdrop"
+    );
+    animateModal(
+      allNotificationsModalRef,
+      showAllNotifications,
+      "all-notifications-backdrop"
+    );
+    animateModal(
+      deleteConfirmModalRef,
+      showDeleteConfirmModal,
+      "delete-confirm-backdrop"
+    );
+  }, [
+    isEditModalOpen,
+    isSuccessModalOpen,
+    isDeleteSuccessModalOpen,
+    showAllNotifications,
+    showDeleteConfirmModal,
+  ]);
+
+  const handleDeleteNotificationClick = (notification) => {
+    setNotificationToDelete(notification);
+    setShowDeleteConfirmModal(true);
+  };
+
+  const handleDeleteNotification = async () => {
+    if (!notificationToDelete) return;
+
+    const token = localStorage.getItem("token");
+    try {
+      await axios.delete(
+        `http://localhost:8084/api/contact/message/${notificationToDelete.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token.trim()}`,
+          },
+        }
+      );
+      setNotifications((prev) =>
+        prev.filter((n) => n.id !== notificationToDelete.id)
+      );
+      prevNotificationIds.current.delete(notificationToDelete.id);
+      setShowDeleteConfirmModal(false);
+      setNotificationToDelete(null);
+      setIsDeleteSuccessModalOpen(true);
+
+      setTimeout(() => {
+        setIsDeleteSuccessModalOpen(false);
+      }, 1000);
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      setErrorMessage(error.message || "Không thể xóa thông báo.");
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -284,6 +383,29 @@ const Headerowner = () => {
     }
   };
 
+  // Format date for display
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("vi-VN", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  };
+
+  // Split text for karaoke effect
+  const splitText = (text) => {
+    return text.split("").map((char, index) => (
+      <span
+        key={index}
+        className="inline-block"
+        data-aos="fade-up"
+        data-aos-delay={`${index * 50}`}
+      >
+        {char}
+      </span>
+    ));
+  };
+
   const navigationItems = [
     { to: "/owner", label: "Dashboard", icon: Home },
     { to: "/owner/ownerbookings", label: "Bookmarks", icon: Calendar },
@@ -311,7 +433,7 @@ const Headerowner = () => {
                   {salonData ? salonData.name : "Salon Owner"}
                 </h1>
                 <p className="text-xs text-gray-400 truncate">
-                  Management System
+                  Hệ thống quản trị
                 </p>
               </div>
             </div>
@@ -337,13 +459,256 @@ const Headerowner = () => {
                 );
               })}
             </nav>
-            {/* Right Side */}
             <div className="flex items-center space-x-4">
-              {/* Notifications */}
-              <button className="relative p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
-                <Bell className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-              </button>
+              <div className="relative">
+                <button
+                  className="relative p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  onClick={() => setShowNotifications(true)}
+                >
+                  <Bell className="w-5 h-5" />
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-xs text-white">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Recent Notifications Dropdown */}
+                {showNotifications && (
+                  <>
+                    <div
+                      className="fixed inset-0 bg-opacity-50 z-40"
+                      onClick={() => setShowNotifications(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-96 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50">
+                      <div className="flex justify-between items-center px-4 py-3 border-b border-gray-700">
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">
+                            Thông báo
+                          </h3>
+                          <p className="text-xs text-gray-400">
+                            {notifications.length} thông báo gần nhất
+                          </p>
+                        </div>
+                        <button
+                          className="text-gray-400 hover:text-white transition-colors"
+                          onClick={() => setShowNotifications(false)}
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="divide-y divide-gray-700 max-h-64 overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.slice(0, 3).map((notification) => (
+                            <div
+                              key={notification.id}
+                              className="p-4 hover:bg-gray-700 transition-colors duration-200 relative"
+                            >
+                              <button
+                                onClick={() =>
+                                  handleDeleteNotificationClick(notification)
+                                }
+                                className="absolute top-2 right-2 text-red-500 hover:text-red-400 transition-colors"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0">
+                                  <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                                    <User className="w-5 h-5 text-white" />
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white">
+                                    {notification.fullName}
+                                  </p>
+                                  <p className="text-sm text-gray-300 mt-1">
+                                    {notification.message}
+                                  </p>
+                                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
+                                    <span>📞 {notification.phoneNumber}</span>
+                                    <span>✉️ {notification.email}</span>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {formatDate(notification.createdAt)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 text-gray-400 text-center">
+                            Không có thông báo
+                          </div>
+                        )}
+                      </div>
+
+                      {notifications.length > 0 && (
+                        <div className="p-3 border-t border-gray-700">
+                          <button
+                            onClick={() => {
+                              setShowNotifications(false);
+                              setShowAllNotifications(true);
+                            }}
+                            className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                          >
+                            <span>Xem tất cả</span>
+                            <span className="text-sm">
+                              ({notifications.length})
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* All Notifications Modal */}
+                {showAllNotifications && (
+                  <>
+                    <div
+                      className="all-notifications-backdrop fixed inset-0 bg-black bg-opacity-50 z-50"
+                      onClick={() => setShowAllNotifications(false)}
+                    />
+                    <div className="fixed inset-0 flex items-center justify-center z-50">
+                      <div
+                        ref={allNotificationsModalRef}
+                        className="relative bg-gray-800 w-full max-w-3xl max-h-[80vh] rounded-xl shadow-xl overflow-hidden"
+                      >
+                        <div className="sticky top-0 bg-gray-800 px-6 py-4 border-b border-gray-700 flex justify-between items-center z-10">
+                          <h3 className="text-xl font-bold text-white">
+                            Tất cả thông báo
+                          </h3>
+                          <button
+                            onClick={() => setShowAllNotifications(false)}
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <X className="w-6 h-6" />
+                          </button>
+                        </div>
+
+                        <div className="overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 max-h-[calc(80vh-80px)]">
+                          {notifications.length > 0 ? (
+                            notifications.map((notification) => (
+                              <div
+                                key={notification.id}
+                                className="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 transition-colors duration-200 relative"
+                              >
+                                <button
+                                  onClick={() =>
+                                    handleDeleteNotificationClick(notification)
+                                  }
+                                  className="absolute top-2 right-2 text-red-500 hover:text-red-400 transition-colors"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                                <div className="flex items-start gap-4">
+                                  <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
+                                    <User className="w-6 h-6 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-lg font-semibold text-white">
+                                      {notification.fullName}
+                                    </p>
+                                    <p className="text-gray-300 mt-1">
+                                      {notification.message}
+                                    </p>
+                                    <div className="flex items-center gap-6 mt-3 text-sm text-gray-400">
+                                      <span className="flex items-center gap-2">
+                                        <Phone className="w-4 h-4" />
+                                        {notification.phoneNumber}
+                                      </span>
+                                      <span className="flex items-center gap-2">
+                                        <Mail className="w-4 h-4" />
+                                        {notification.email}
+                                      </span>
+                                      <span className="flex items-center gap-2">
+                                        <Clock className="w-4 h-4" />
+                                        {formatDate(notification.createdAt)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-gray-400 text-center p-4">
+                              Không có thông báo
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Delete Confirmation Modal */}
+                {showDeleteConfirmModal && (
+                  <>
+                    <div
+                      className="delete-confirm-backdrop fixed inset-0 bg-black bg-opacity-50 z-60"
+                      onClick={() => setShowDeleteConfirmModal(false)}
+                    />
+                    <div className="fixed inset-0 flex items-center justify-center z-60">
+                      <div
+                        ref={deleteConfirmModalRef}
+                        className="bg-gray-800 rounded-xl border border-gray-700 p-6 max-w-sm w-full mx-4"
+                      >
+                        <div className="text-center">
+                          <Trash2 className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                          <h2 className="text-xl font-bold text-white mb-4">
+                            {splitText("Xác nhận xóa thông báo?")}
+                          </h2>
+                          <p className="text-gray-300 mb-6">
+                            Hành động này không thể hoàn tác.
+                          </p>
+                          <div className="flex justify-center space-x-4">
+                            <button
+                              onClick={() => setShowDeleteConfirmModal(false)}
+                              className="px-6 py-2 bg-gray-600 text-gray-300 rounded-lg hover:bg-gray-700"
+                            >
+                              Hủy
+                            </button>
+                            <button
+                              onClick={handleDeleteNotification}
+                              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Delete Success Modal */}
+                {isDeleteSuccessModalOpen && (
+                  <>
+                    <div className="delete-success-modal-backdrop fixed inset-0 bg-black bg-opacity-50 z-50" />
+                    <div className="fixed inset-0 flex items-center justify-center z-50">
+                      <div
+                        ref={deleteSuccessModalRef}
+                        className="bg-gray-800 rounded-xl border border-gray-700 p-6 max-w-sm w-full mx-4"
+                      >
+                        <div className="text-center">
+                          <FaCheckCircle className="text-5xl text-green-500 mx-auto mb-4 animate-bounce" />
+                          <h2 className="text-xl font-bold text-white mb-4">
+                            Xóa thông báo thành công!
+                          </h2>
+                          <button
+                            onClick={() => setIsDeleteSuccessModalOpen(false)}
+                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                          >
+                            Đóng
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* Profile Dropdown */}
               <div className="relative">
@@ -361,7 +726,7 @@ const Headerowner = () => {
 
                 {/* Profile Dropdown Menu */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                  <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50">
                     <div className="py-2">
                       {userData && (
                         <div className="px-4 py-2 border-b border-gray-700">
