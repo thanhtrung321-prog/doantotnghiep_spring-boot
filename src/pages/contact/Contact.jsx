@@ -69,14 +69,7 @@ const Contact = () => {
   const validateForm = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9]{10,11}$/;
-    const profanityList = [
-      "fuck",
-      "shit",
-      "damn",
-      "asshole",
-      "bitch",
-      // Add more as needed
-    ];
+    const profanityList = ["fuck", "shit", "damn", "asshole", "bitch"];
 
     if (!emailRegex.test(formData.email)) {
       toast.error("Vui lòng nhập email hợp lệ");
@@ -161,6 +154,18 @@ const Contact = () => {
     );
   };
 
+  // Parse address
+  const parseAddress = (address) => {
+    if (!address) return { province: "", district: "", town: "", specific: "" };
+    const parts = address.split("|");
+    return {
+      province: parts[0]?.trim() || "",
+      district: parts[1]?.trim() || "",
+      town: parts[2]?.trim() || "",
+      specific: parts[3]?.trim() || "",
+    };
+  };
+
   // Slider settings
   const sliderSettings = {
     dots: true,
@@ -175,7 +180,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="bg-gradient-to-b from-gray-50 to-gray-200 min-h-screen py-42">
+    <div className="bg-gradient-to-b from-gray-50 to-gray-200 min-h-screen py-36">
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -254,9 +259,30 @@ const Contact = () => {
                     </svg>
                     <div>
                       <h4 className="font-semibold text-amber-800">Địa Chỉ</h4>
-                      <p className="text-gray-600">
-                        {selectedSalon.address}, {selectedSalon.city}
-                      </p>
+                      {(() => {
+                        const { province, district, town, specific } =
+                          parseAddress(selectedSalon.address);
+                        return (
+                          <>
+                            {province && (
+                              <p className="text-gray-600">Tỉnh: {province}</p>
+                            )}
+                            {district && (
+                              <p className="text-gray-600">Huyện: {district}</p>
+                            )}
+                            {town && (
+                              <p className="text-gray-600">
+                                Thị trấn/Phường: {town}
+                              </p>
+                            )}
+                            {specific && (
+                              <p className="text-gray-600">
+                                Địa chỉ cụ thể: {specific}
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-start">

@@ -210,12 +210,12 @@ const Chatbot = () => {
         {
           opacity: 0,
           scale: 0.8,
-          color: "#ffffff",
+          color: "#8B5FBF",
         },
         {
           opacity: 1,
           scale: 1,
-          color: "#ff69b4",
+          color: "#FFFFFF",
           duration: 0.8,
           stagger: 0.1,
           ease: "elastic.out(1, 0.5)",

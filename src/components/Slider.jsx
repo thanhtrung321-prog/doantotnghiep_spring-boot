@@ -381,7 +381,7 @@ const Slider = ({ className = "" }) => {
           >
             Beauty Salon
           </h1>
-          <p className="text-white/70 text-sm">Đang tải trải nghiệm...</p>
+          <p className="text-white/70 text-sm">Đang tải dịch vụ ...</p>
 
           {/* Thanh loading dưới */}
           <div className="w-24 h-1 bg-white/20 rounded-full mt-2 mx-auto overflow-hidden">
